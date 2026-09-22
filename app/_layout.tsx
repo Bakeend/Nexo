@@ -1,4 +1,5 @@
 import { router, Stack } from 'expo-router';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -23,14 +24,17 @@ export default function RootLayout() {
       .catch(() => setReady(true));
   }, []);
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return;
     let subscription: { remove: () => void } | undefined;
-    import('expo-notifications').then((Notifications) => {
-      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        const reminderId = response.notification.request.content.data?.reminderId;
-        if (typeof reminderId === 'string') router.push({ pathname: '/reminders/[id]', params: { id: reminderId } });
-      });
-    });
+    import('expo-notifications')
+      .then((Notifications) => {
+        if (typeof Notifications.addNotificationResponseReceivedListener !== 'function') return;
+        subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+          const reminderId = response.notification.request.content.data?.reminderId;
+          if (typeof reminderId === 'string') router.push({ pathname: '/reminders/[id]', params: { id: reminderId } });
+        });
+      })
+      .catch(() => undefined);
     return () => subscription?.remove();
   }, []);
   if (!ready)

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type * as Notifications from 'expo-notifications';
 import { calculateNextOccurrence } from '@/utils/dates';
 import { findReminder, listReminders, updateReminder } from '@/database/repositories';
@@ -9,16 +10,18 @@ let notificationsModule: Promise<NotificationsModule | null> | undefined;
 let handlerConfigured = false;
 
 async function getNotifications(): Promise<NotificationsModule | null> {
-  if (Platform.OS === 'web') return null;
-  notificationsModule ??= import('expo-notifications').then((module) => {
-    if (!handlerConfigured) {
-      module.setNotificationHandler({
-        handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
-      });
-      handlerConfigured = true;
-    }
-    return module;
-  });
+  if (Platform.OS === 'web' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
+  notificationsModule ??= import('expo-notifications')
+    .then((module) => {
+      if (!handlerConfigured) {
+        module.setNotificationHandler({
+          handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+        });
+        handlerConfigured = true;
+      }
+      return module;
+    })
+    .catch(() => null);
   return notificationsModule;
 }
 
