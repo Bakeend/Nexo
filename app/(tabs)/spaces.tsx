@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/design/theme';
 import { BottomNav, EmptyState, FloatingButton, Header, ListRow } from '@/components/ui';
 import { listSpaces } from '@/database/repositories';
@@ -14,7 +15,7 @@ export default function Spaces() {
   }, [load]);
   const add = () => router.push('/spaces/new');
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={['top']} style={styles.root}>
       <Header title="Espaços" action={add} actionLabel="+" />
       <View style={styles.content}>
         {spaces.length ? (
@@ -40,7 +41,7 @@ export default function Spaces() {
       </View>
       <BottomNav />
       <FloatingButton onPress={add} />
-    </View>
+    </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({

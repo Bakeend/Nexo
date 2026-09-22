@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
 import { BottomNav, CaptureSheet, EmptyState, FloatingButton, Header, ListRow, SectionTitle } from '@/components/ui';
 import { listReminders, listTasks } from '@/database/repositories';
@@ -24,7 +25,7 @@ export default function Today() {
     load();
   }, [load]);
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={['top']} style={styles.root}>
       <Header
         title="Hoje"
         subtitle={new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
@@ -95,7 +96,7 @@ export default function Today() {
       <BottomNav />
       <FloatingButton onPress={() => setOpen(true)} />
       <CaptureSheet visible={open} onClose={() => setOpen(false)} onCreated={load} />
-    </View>
+    </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({

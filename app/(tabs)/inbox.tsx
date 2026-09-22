@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
 import { BottomNav, CaptureSheet, EmptyState, FloatingButton, Header, ListRow } from '@/components/ui';
 import { createNote, createTask, deleteInbox, listAttachments, listInbox, organizeInbox } from '@/database/repositories';
@@ -22,7 +23,7 @@ export default function Inbox() {
     setSelected({ item, attachmentId: attachments[0]?.id });
   };
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={['top']} style={styles.root}>
       <Header title="Caixa de entrada" action={() => setOpen(true)} actionLabel="+" />
       <View style={styles.content}>
         <View style={styles.count}>
@@ -104,7 +105,7 @@ export default function Inbox() {
           },
         ]}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
