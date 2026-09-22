@@ -4,7 +4,6 @@ import React, { PropsWithChildren, ReactNode, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing, typography } from '@/design/theme';
-import { useUIStore } from '@/stores/ui.store';
 import { createInboxCapture } from '@/database/repositories';
 import { parseCapture } from '@/utils/capture-parser';
 
@@ -357,11 +356,6 @@ export function CaptureSheet({ visible, onClose, onCreated }: { visible: boolean
       </KeyboardAvoidingView>
     </Modal>
   );
-}
-
-export function useCapture() {
-  const open = useUIStore((state) => state.setCaptureOpen);
-  return () => open(true);
 }
 
 const styles = StyleSheet.create({

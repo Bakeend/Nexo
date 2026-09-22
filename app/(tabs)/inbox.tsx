@@ -7,13 +7,11 @@ import { BottomNav, CaptureSheet, EmptyState, FloatingButton, Header, ListRow } 
 import { createNote, createTask, deleteInbox, listAttachments, listInbox, organizeInbox } from '@/database/repositories';
 import { ActionSheet } from '@/components/visual';
 import type { InboxItem } from '@/types/domain';
-import { useUIStore } from '@/stores/ui.store';
 
 export default function Inbox() {
   const [items, setItems] = useState<InboxItem[]>([]);
   const [selected, setSelected] = useState<{ item: InboxItem; attachmentId?: string } | null>(null);
-  const open = useUIStore((s) => s.captureOpen);
-  const setOpen = useUIStore((s) => s.setCaptureOpen);
+  const [open, setOpen] = useState(false);
   const load = useCallback(async () => setItems(await listInbox()), []);
   useEffect(() => {
     load();

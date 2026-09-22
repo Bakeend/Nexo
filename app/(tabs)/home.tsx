@@ -3,15 +3,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
-import { BottomNav, CaptureSheet, FloatingButton, IconButton, ListRow, SectionTitle, useCapture } from '@/components/ui';
+import { BottomNav, CaptureSheet, FloatingButton, IconButton, ListRow, SectionTitle } from '@/components/ui';
 import { listInbox, listNotes, listReminders, listSpaces, listTasks } from '@/database/repositories';
-import { useUIStore } from '@/stores/ui.store';
 
 export default function Home() {
   const [counts, setCounts] = useState({ inbox: 0, notes: 0, tasks: 0, reminders: 0, spaces: 0 });
-  const openCapture = useCapture();
-  const captureOpen = useUIStore((s) => s.captureOpen);
-  const setCaptureOpen = useUIStore((s) => s.setCaptureOpen);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const load = useCallback(async () => {
     const [inbox, notes, tasks, reminders, spaces] = await Promise.all([
       listInbox(),
@@ -45,7 +42,7 @@ export default function Home() {
           </View>
           <View style={styles.actions}>
             <IconButton icon="settings-outline" label="Configurações" onPress={() => router.push('/settings')} />
-            <Pressable style={styles.addTop} onPress={openCapture} accessibilityLabel="Criar">
+            <Pressable style={styles.addTop} onPress={() => setCaptureOpen(true)} accessibilityLabel="Criar">
               <Text style={styles.addText}>+</Text>
             </Pressable>
           </View>
@@ -81,7 +78,7 @@ export default function Home() {
         </View>
       </View>
       <BottomNav />
-      <FloatingButton onPress={openCapture} />
+      <FloatingButton onPress={() => setCaptureOpen(true)} />
       <CaptureSheet visible={captureOpen} onClose={() => setCaptureOpen(false)} onCreated={load} />
     </SafeAreaView>
   );
