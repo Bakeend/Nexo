@@ -1,0 +1,10 @@
+appId: com.bakeend.nexo
+---
+- launchApp:
+    clearState: true
+- assertVisible: 'Nexo'
+- tapOn: 'Continuar'
+- tapOn: 'Continuar'
+- tapOn: 'Começar'
+- assertVisible: 'Seu espaço'
+- assertVisible: 'Caixa de entrada'

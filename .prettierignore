@@ -1,0 +1,8 @@
+plano.md
+node_modules
+.nexo-scaffold
+package-lock.json
+dist
+build
+drizzle/meta
+drizzle/migrations.js

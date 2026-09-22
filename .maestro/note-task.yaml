@@ -1,0 +1,18 @@
+appId: com.bakeend.nexo
+---
+- launchApp
+- tapOn: 'Criar'
+- tapOn: 'Nota'
+- tapOn: 'Título'
+- inputText: 'Ideias para o projeto'
+- tapOn: 'Comece a escrever...'
+- inputText: 'Modo offline e sincronização futura'
+- tapOn: 'Salvar'
+- tapOn: 'Voltar'
+- assertVisible: 'Ideias para o projeto'
+- tapOn: 'Criar'
+- tapOn: 'Tarefa'
+- tapOn: 'O que precisa ser feito?'
+- inputText: 'Estudar HTTP'
+- tapOn: 'Criar tarefa'
+- assertVisible: 'Estudar HTTP'

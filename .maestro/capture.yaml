@@ -1,0 +1,9 @@
+appId: com.bakeend.nexo
+---
+- launchApp
+- tapOn: 'Criar'
+- tapOn: 'Apenas escreva...'
+- inputText: 'Pesquisar Docker amanhã'
+- tapOn: 'Salvar na Caixa de entrada'
+- tapOn: 'Inbox'
+- assertVisible: 'Pesquisar Docker amanhã'
