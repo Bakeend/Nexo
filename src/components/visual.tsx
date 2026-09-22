@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { addMonths, subMonths } from 'date-fns';
-import { PropsWithChildren, ReactNode, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, shadow, spacing, typography } from '@/design/theme';
 
@@ -13,6 +13,55 @@ export type SheetOption = {
   destructive?: boolean;
   onPress: () => void;
 };
+
+type SnackbarTone = 'success' | 'error' | 'info';
+type SnackbarState = { message: string; tone: SnackbarTone } | null;
+type SnackbarContextValue = { showSnackbar: (message: string, tone?: SnackbarTone) => void };
+
+const SnackbarContext = createContext<SnackbarContextValue | null>(null);
+
+export function SnackbarProvider({ children }: PropsWithChildren) {
+  const [snackbar, setSnackbar] = useState<SnackbarState>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showSnackbar = useCallback((message: string, tone: SnackbarTone = 'success') => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setSnackbar({ message, tone });
+    timeoutRef.current = setTimeout(() => setSnackbar(null), 2600);
+  }, []);
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
+  return (
+    <SnackbarContext.Provider value={{ showSnackbar }}>
+      <View style={styles.providerRoot}>
+        {children}
+        {snackbar ? <Snackbar message={snackbar.message} tone={snackbar.tone} /> : null}
+      </View>
+    </SnackbarContext.Provider>
+  );
+}
+
+export function useSnackbar() {
+  const context = useContext(SnackbarContext);
+  if (!context) throw new Error('useSnackbar deve ser usado dentro de SnackbarProvider');
+  return context;
+}
+
+function Snackbar({ message, tone }: { message: string; tone: SnackbarTone }) {
+  const icon = tone === 'error' ? 'alert-circle' : tone === 'info' ? 'information-circle' : 'checkmark-circle';
+  const color = tone === 'error' ? colors.danger : tone === 'info' ? colors.accent : colors.success;
+  return (
+    <View pointerEvents="box-none" style={styles.snackbarHost}>
+      <View accessibilityRole="alert" style={styles.snackbar}>
+        <Ionicons name={icon} size={20} color={color} />
+        <Text style={styles.snackbarText}>{message}</Text>
+      </View>
+    </View>
+  );
+}
 
 export function Checkbox({ checked, onPress, label }: { checked: boolean; onPress: () => void; label?: string }) {
   return (
@@ -249,6 +298,31 @@ export function DateTimeSheet({
 }
 
 const styles = StyleSheet.create({
+  providerRoot: { flex: 1 },
+  snackbarHost: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    zIndex: 100,
+  },
+  snackbar: {
+    maxWidth: 520,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.ink,
+    ...shadow,
+  },
+  snackbarText: { ...typography.bodyStrong, color: colors.white, flexShrink: 1 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   dialogRoot: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },

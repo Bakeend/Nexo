@@ -4,7 +4,9 @@ import { colors, spacing, typography } from '@/design/theme';
 import { Header, Segmented } from '@/components/ui';
 import { useUIStore } from '@/stores/ui.store';
 import { setSetting } from '@/database/repositories';
+import { useSnackbar } from '@/components/visual';
 export default function Appearance() {
+  const { showSnackbar } = useSnackbar();
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
   return (
@@ -20,6 +22,7 @@ export default function Appearance() {
             const nextTheme = value as typeof theme;
             setTheme(nextTheme);
             void setSetting('theme', nextTheme);
+            showSnackbar('Aparência atualizada');
           }}
         />
         <Text style={styles.note}>A preferência é mantida localmente no dispositivo.</Text>

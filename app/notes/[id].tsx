@@ -3,10 +3,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '@/design/theme';
-import { ActionSheet, AppDialog, Checkbox } from '@/components/visual';
-import { AppIcon, Header, PrimaryButton, SecondaryButton } from '@/components/ui';
-import { archiveNote, createTask, findNote, trashNote, updateNote } from '@/database/repositories';
-import type { Note, NoteBlock } from '@/types/domain';
+import { ActionSheet, AppDialog, BottomSheet, Checkbox, useSnackbar } from '@/components/visual';
+import { AppIcon, Header, IconButton, Input, PrimaryButton, SecondaryButton } from '@/components/ui';
+import {
+  archiveNote,
+  createTask,
+  findAttachment,
+  findNote,
+  trashAttachment,
+  trashNote,
+  updateAttachment,
+  updateNote,
+} from '@/database/repositories';
+import type { Attachment, Note, NoteBlock } from '@/types/domain';
 import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 
 export default function NoteDetail() {
@@ -14,9 +23,15 @@ export default function NoteDetail() {
   const [note, setNote] = useState<Note>();
   const [actionsOpen, setActionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [attachmentAction, setAttachmentAction] = useState<Attachment>();
+  const [attachmentRename, setAttachmentRename] = useState<Attachment>();
+  const [renameValue, setRenameValue] = useState('');
+  const { showSnackbar } = useSnackbar();
+
   const load = useCallback(async () => {
     if (id) setNote(await findNote(id));
   }, [id]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -31,17 +46,43 @@ export default function NoteDetail() {
 
   const blocks = parseNoteBlocks(note.content);
   const updateBlocks = async (next: NoteBlock[]) => {
-    await updateNote(note.id, { content: serializeNoteBlocks(next) });
-    setNote((current) => current && { ...current, content: serializeNoteBlocks(next), updatedAt: new Date().toISOString() });
+    const content = serializeNoteBlocks(next);
+    await updateNote(note.id, { content });
+    setNote((current) => current && { ...current, content, updatedAt: new Date().toISOString() });
   };
   const createRelatedTask = async () => {
     const task = await createTask({ title: `Revisar: ${note.title || 'nota'}`, relatedNoteId: note.id });
+    showSnackbar('Tarefa relacionada criada');
     router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
   };
   const deleteNote = async () => {
     setDeleteOpen(false);
     await trashNote(note.id);
+    showSnackbar('Nota enviada para a lixeira');
     router.back();
+  };
+  const startRenameAttachment = () => {
+    if (!attachmentAction) return;
+    setRenameValue(attachmentAction.originalName || 'Anexo');
+    setAttachmentRename(attachmentAction);
+    setAttachmentAction(undefined);
+  };
+  const saveAttachmentRename = async () => {
+    if (!attachmentRename) return;
+    const name = renameValue.trim() || 'Anexo';
+    await updateAttachment(attachmentRename.id, { originalName: name });
+    await updateBlocks(
+      blocks.map((block) => ('attachmentId' in block && block.attachmentId === attachmentRename.id ? { ...block, label: name } : block)),
+    );
+    setAttachmentRename(undefined);
+    showSnackbar('Nome do anexo atualizado');
+  };
+  const removeAttachment = async () => {
+    if (!attachmentAction) return;
+    await trashAttachment(attachmentAction.id);
+    await updateBlocks(blocks.filter((block) => !('attachmentId' in block) || block.attachmentId !== attachmentAction.id));
+    setAttachmentAction(undefined);
+    showSnackbar('Anexo removido');
   };
 
   return (
@@ -81,20 +122,29 @@ export default function NoteDetail() {
             );
           if (block.type === 'image' || block.type === 'file' || block.type === 'audio')
             return (
-              <Pressable
-                key={`${block.attachmentId}-${index}`}
-                onPress={() => router.push({ pathname: '/media/preview', params: { id: block.attachmentId } })}
-                style={styles.attachment}
-              >
-                <AppIcon
-                  name={block.type === 'image' ? 'image-outline' : block.type === 'audio' ? 'mic-outline' : 'document-attach-outline'}
+              <View key={`${block.attachmentId}-${index}`} style={styles.attachment}>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/media/preview', params: { id: block.attachmentId } })}
+                  style={styles.attachmentOpen}
+                >
+                  <AppIcon
+                    name={block.type === 'image' ? 'image-outline' : block.type === 'audio' ? 'mic-outline' : 'document-attach-outline'}
+                  />
+                  <View style={styles.attachmentCopy}>
+                    <Text style={styles.attachmentTitle}>{block.label || 'Anexo'}</Text>
+                    <Text style={styles.attachmentMeta}>Abrir conteúdo</Text>
+                  </View>
+                </Pressable>
+                <IconButton
+                  icon="ellipsis-horizontal"
+                  label="Ações do anexo"
+                  onPress={() =>
+                    findAttachment(block.attachmentId).then((found) => {
+                      if (found) setAttachmentAction(found);
+                    })
+                  }
                 />
-                <View style={styles.attachmentCopy}>
-                  <Text style={styles.attachmentTitle}>{block.label || 'Anexo'}</Text>
-                  <Text style={styles.attachmentMeta}>Abrir conteúdo</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
+              </View>
             );
           if (block.type === 'link')
             return (
@@ -153,6 +203,7 @@ export default function NoteDetail() {
             icon: 'archive-outline',
             onPress: async () => {
               await archiveNote(note.id);
+              showSnackbar('Nota arquivada');
               router.back();
             },
           },
@@ -165,6 +216,30 @@ export default function NoteDetail() {
           },
         ]}
       />
+      <ActionSheet
+        visible={Boolean(attachmentAction)}
+        title={attachmentAction?.originalName || 'Anexo'}
+        onClose={() => setAttachmentAction(undefined)}
+        options={
+          attachmentAction
+            ? [
+                {
+                  label: 'Abrir anexo',
+                  icon: 'eye-outline',
+                  onPress: () => router.push({ pathname: '/media/preview', params: { id: attachmentAction.id } }),
+                },
+                { label: 'Renomear', icon: 'create-outline', onPress: startRenameAttachment },
+                { label: 'Remover', icon: 'trash-outline', destructive: true, onPress: removeAttachment },
+              ]
+            : []
+        }
+      />
+      <BottomSheet visible={Boolean(attachmentRename)} title="Renomear anexo" onClose={() => setAttachmentRename(undefined)}>
+        <Input value={renameValue} onChangeText={setRenameValue} placeholder="Nome do anexo" autoFocus />
+        <View style={styles.renameButton}>
+          <PrimaryButton title="Salvar nome" onPress={saveAttachmentRename} />
+        </View>
+      </BottomSheet>
       <AppDialog
         visible={deleteOpen}
         title="Enviar nota para a lixeira?"
@@ -198,10 +273,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
+  attachmentOpen: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minHeight: 64 },
   attachmentCopy: { flex: 1 },
   attachmentTitle: { ...typography.bodyStrong, color: colors.ink },
   attachmentMeta: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
-  chevron: { fontSize: 24, color: colors.inkMuted },
   actions: { gap: spacing.sm, marginTop: spacing.xl },
+  renameButton: { marginTop: spacing.md },
   muted: { ...typography.body, color: colors.inkMuted, padding: spacing.lg },
 });

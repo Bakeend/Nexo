@@ -3,12 +3,15 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { colors, spacing } from '@/design/theme';
 import { Header, Input, PrimaryButton } from '@/components/ui';
+import { useSnackbar } from '@/components/visual';
 import { createSpace } from '@/database/repositories';
 export default function NewSpace() {
+  const { showSnackbar } = useSnackbar();
   const [name, setName] = useState('');
   const save = async () => {
     if (!name.trim()) return;
     const space = await createSpace(name);
+    showSnackbar('Espaço criado');
     router.replace({ pathname: '/spaces/[id]', params: { id: space.id } });
   };
   return (

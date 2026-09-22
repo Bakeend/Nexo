@@ -7,6 +7,7 @@ import { FloatingButton } from '@/components/ui';
 import { listTasks, toggleTask } from '@/database/repositories';
 import { colors, radius, spacing, typography } from '@/design/theme';
 import type { Priority, Task } from '@/types/domain';
+import { useSnackbar } from '@/components/visual';
 
 const tabs = ['Hoje', 'Próximas', 'Todas'];
 
@@ -23,6 +24,7 @@ function priorityLabel(priority: Priority) {
 }
 
 export default function Tasks() {
+  const { showSnackbar } = useSnackbar();
   const [tab, setTab] = useState('Hoje');
   const [tasks, setTasks] = useState<Task[]>([]);
 
@@ -53,7 +55,10 @@ export default function Tasks() {
           accessibilityLabel={completed ? 'Marcar como pendente' : 'Marcar como concluída'}
           onPress={(event) => {
             event.stopPropagation();
-            toggleTask(task.id, !completed).then(load);
+            toggleTask(task.id, !completed).then(() => {
+              showSnackbar(completed ? 'Tarefa reaberta' : 'Tarefa concluída');
+              load();
+            });
           }}
           style={[styles.checkbox, completed && styles.checkboxCompleted]}
           hitSlop={8}
@@ -72,11 +77,7 @@ export default function Tasks() {
           <View
             style={[
               styles.priorityPill,
-              task.priority === 'high'
-                ? styles.priorityHigh
-                : task.priority === 'medium'
-                  ? styles.priorityMedium
-                  : styles.priorityLow,
+              task.priority === 'high' ? styles.priorityHigh : task.priority === 'medium' ? styles.priorityMedium : styles.priorityLow,
             ]}
           >
             <Text style={[styles.priorityText, task.priority === 'high' && styles.priorityHighText]}>{priority}</Text>

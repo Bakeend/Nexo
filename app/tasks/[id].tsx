@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow, PrimaryButton, SecondaryButton } from '@/components/ui';
-import { ActionSheet, AppDialog } from '@/components/visual';
+import { ActionSheet, AppDialog, useSnackbar } from '@/components/visual';
 import { findTask, toggleTask, trashTask } from '@/database/repositories';
 import type { Task } from '@/types/domain';
 export default function TaskDetail() {
@@ -11,6 +11,7 @@ export default function TaskDetail() {
   const [task, setTask] = useState<Task>();
   const [actionsOpen, setActionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const { showSnackbar } = useSnackbar();
   const load = useCallback(async () => {
     if (id) setTask(await findTask(id));
   }, [id]);
@@ -27,7 +28,13 @@ export default function TaskDetail() {
   const deleteTask = async () => {
     setDeleteOpen(false);
     await trashTask(task.id);
+    showSnackbar('Tarefa excluída');
     router.back();
+  };
+  const toggle = async () => {
+    await toggleTask(task.id, !task.completedAt);
+    showSnackbar(task.completedAt ? 'Tarefa reaberta' : 'Tarefa concluída');
+    await load();
   };
   return (
     <View style={styles.root}>
@@ -48,10 +55,7 @@ export default function TaskDetail() {
           />
         ) : null}
         <View style={styles.actions}>
-          <PrimaryButton
-            title={task.completedAt ? 'Reabrir tarefa' : 'Concluir tarefa'}
-            onPress={() => toggleTask(task.id, !task.completedAt).then(load)}
-          />
+          <PrimaryButton title={task.completedAt ? 'Reabrir tarefa' : 'Concluir tarefa'} onPress={toggle} />
           <SecondaryButton title="Mais ações" onPress={() => setActionsOpen(true)} />
         </View>
       </View>
@@ -63,7 +67,7 @@ export default function TaskDetail() {
           {
             label: task.completedAt ? 'Reabrir' : 'Concluir',
             icon: task.completedAt ? 'refresh-outline' : 'checkmark-circle-outline',
-            onPress: () => toggleTask(task.id, !task.completedAt).then(load),
+            onPress: toggle,
           },
           { label: 'Editar', icon: 'create-outline', onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
           {

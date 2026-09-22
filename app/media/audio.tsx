@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, PrimaryButton, SecondaryButton } from '@/components/ui';
-import { AppDialog } from '@/components/visual';
-import { appendNoteBlock, createAttachment, createInboxCapture } from '@/database/repositories';
+import { AppDialog, useSnackbar } from '@/components/visual';
+import { appendNoteBlock, createAttachment, createInboxCapture, listAttachments } from '@/database/repositories';
 import { copyMediaToAppStorage } from '@/services/media-service';
 export default function AudioCapture() {
+  const { showSnackbar } = useSnackbar();
   const { noteId } = useLocalSearchParams<{ noteId?: string }>();
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const state = useAudioRecorderState(recorder);
@@ -28,31 +29,36 @@ export default function AudioCapture() {
     if (recorder.uri) {
       const audio = await copyMediaToAppStorage(recorder.uri, `audio-${Date.now()}.m4a`);
       if (noteId) {
+        const existingAudioCount = (await listAttachments(noteId)).filter((item) => item.type === 'audio').length;
+        const friendlyName = existingAudioCount === 0 ? 'Nova gravação de voz' : `Gravação de voz ${existingAudioCount + 1}`;
         const attachment = await createAttachment({
           itemId: noteId,
           itemType: 'note',
           type: 'audio',
-          originalName: `audio-${new Date().toISOString()}.m4a`,
+          originalName: friendlyName,
           localPath: audio.uri,
           mimeType: 'audio/m4a',
           sizeBytes: audio.size,
           durationMs: state.durationMillis,
         });
-        await appendNoteBlock(noteId, { type: 'audio', attachmentId: attachment.id, label: 'Áudio gravado' });
+        await appendNoteBlock(noteId, { type: 'audio', attachmentId: attachment.id, label: friendlyName });
         setStatus('Áudio inserido na nota');
+        showSnackbar('Áudio anexado à nota');
       } else {
-        const capture = await createInboxCapture(`Áudio gravado\n${audio.uri}`, 'audio');
+        const friendlyName = 'Nova gravação de voz';
+        const capture = await createInboxCapture(`Áudio: ${friendlyName}`, 'audio');
         await createAttachment({
           itemId: capture.itemId,
           itemType: 'audio',
           type: 'audio',
-          originalName: `audio-${new Date().toISOString()}.m4a`,
+          originalName: friendlyName,
           localPath: audio.uri,
           mimeType: 'audio/m4a',
           sizeBytes: audio.size,
           durationMs: state.durationMillis,
         });
         setStatus('Áudio salvo na Caixa de entrada');
+        showSnackbar('Áudio salvo na Caixa de entrada');
       }
     }
   };

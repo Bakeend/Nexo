@@ -4,11 +4,40 @@ import React, { PropsWithChildren, ReactNode, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing, typography } from '@/design/theme';
+import { useSnackbar } from '@/components/visual';
 import { createInboxCapture } from '@/database/repositories';
 import { parseCapture } from '@/utils/capture-parser';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 const iconAliases: Record<string, IconName> = { 'file-outline': 'document-outline' };
+
+export function contextEmoji(title: string) {
+  const value = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  if (value.includes('configur')) return '⚙️';
+  if (value.includes('calend')) return '📅';
+  if (value.includes('tarefa')) return '✅';
+  if (value.includes('lembrete')) return '🔔';
+  if (value.includes('nota')) return '📝';
+  if (value.includes('arquivo') || value.includes('anexo')) return '📎';
+  if (value.includes('foto') || value.includes('imagem')) return '📷';
+  if (value.includes('audio') || value.includes('gravar')) return '🎙️';
+  if (value.includes('espaco')) return '🗂️';
+  if (value.includes('entrada') || value.includes('inbox')) return '📥';
+  if (value.includes('busca') || value.includes('pesquis')) return '🔎';
+  if (value.includes('lixeira')) return '🗑️';
+  if (value.includes('tag')) return '🏷️';
+  if (value.includes('backup')) return '🛟';
+  if (value.includes('notific')) return '🔔';
+  if (value.includes('proximo')) return '✨';
+  if (value.includes('agenda')) return '📅';
+  if (value.includes('acesso rapido')) return '⚡️';
+  if (value.includes('navegar')) return '🧭';
+  if (value === 'hoje') return '☀️';
+  return null;
+}
 export function AppIcon({
   name,
   color = colors.accent,
@@ -270,7 +299,7 @@ export function BottomNav() {
   const tabs = [
     { path: '/home', icon: 'home-outline' as IconName, active: 'home', label: 'Início' },
     { path: '/today', icon: 'today-outline' as IconName, active: 'Hoje', label: 'Hoje' },
-    { path: '/inbox', icon: 'file-tray-outline' as IconName, active: 'Inbox', label: 'Inbox' },
+    { path: '/inbox', icon: 'file-tray-outline' as IconName, active: 'Caixa de entrada', label: 'Caixa de entrada' },
     { path: '/spaces', icon: 'grid-outline' as IconName, active: 'Espaços', label: 'Espaços' },
   ];
   return (
@@ -298,6 +327,7 @@ export function BottomNav() {
 }
 
 export function CaptureSheet({ visible, onClose, onCreated }: { visible: boolean; onClose: () => void; onCreated?: () => void }) {
+  const { showSnackbar } = useSnackbar();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const create = async (kind: 'note' | 'task' | 'reminder' | 'file' | 'image' | 'audio' | 'quick_capture') => {
@@ -307,6 +337,7 @@ export function CaptureSheet({ visible, onClose, onCreated }: { visible: boolean
       if (kind === 'quick_capture') {
         await createInboxCapture(text || 'Captura rápida');
         onCreated?.();
+        showSnackbar('Captura salva na Caixa de entrada');
         setText('');
         onClose();
         return;

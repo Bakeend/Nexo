@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow, PrimaryButton, SecondaryButton } from '@/components/ui';
-import { ActionSheet, AppDialog } from '@/components/visual';
+import { ActionSheet, AppDialog, useSnackbar } from '@/components/visual';
 import { completeReminder, findReminder, trashReminder } from '@/database/repositories';
 import { cancelReminder, createNextRecurringReminder, scheduleReminder, snoozeReminder } from '@/services/notification-service';
 import type { Reminder } from '@/types/domain';
@@ -13,6 +13,7 @@ export default function ReminderDetail() {
   const [reminder, setReminder] = useState<Reminder>();
   const [actionsOpen, setActionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const { showSnackbar } = useSnackbar();
   const load = useCallback(async () => {
     if (id) setReminder(await findReminder(id));
   }, [id]);
@@ -29,13 +30,20 @@ export default function ReminderDetail() {
   const finish = async () => {
     if (reminder.repeatRule) await createNextRecurringReminder(reminder);
     else await completeReminder(reminder.id);
+    showSnackbar('Lembrete concluído');
     await load();
   };
   const deleteReminder = async () => {
     setDeleteOpen(false);
     await cancelReminder(reminder);
     await trashReminder(reminder.id);
+    showSnackbar('Lembrete excluído');
     router.back();
+  };
+  const snooze = async () => {
+    await snoozeReminder(reminder, new Date(Date.now() + 10 * 60 * 1000));
+    showSnackbar('Lembrete adiado por 10 minutos');
+    await load();
   };
   return (
     <View style={styles.root}>
@@ -50,10 +58,7 @@ export default function ReminderDetail() {
         {reminder.description ? <Text style={styles.body}>{reminder.description}</Text> : null}
         <View style={styles.actions}>
           <PrimaryButton title={reminder.completedAt ? 'Concluído' : 'Concluir lembrete'} onPress={finish} />
-          <SecondaryButton
-            title="Adiar 10 minutos"
-            onPress={() => snoozeReminder(reminder, new Date(Date.now() + 10 * 60 * 1000)).then(load)}
-          />
+          <SecondaryButton title="Adiar 10 minutos" onPress={snooze} />
         </View>
       </View>
       <ActionSheet
@@ -64,7 +69,7 @@ export default function ReminderDetail() {
           {
             label: 'Adiar 10 minutos',
             icon: 'time-outline',
-            onPress: () => snoozeReminder(reminder, new Date(Date.now() + 10 * 60 * 1000)).then(load),
+            onPress: snooze,
           },
           {
             label: 'Editar',
@@ -82,6 +87,7 @@ export default function ReminderDetail() {
             onPress: async () => {
               if (reminder.enabled) await cancelReminder(reminder);
               else await scheduleReminder(reminder);
+              showSnackbar(reminder.enabled ? 'Lembrete desativado' : 'Lembrete ativado');
               await load();
             },
           },

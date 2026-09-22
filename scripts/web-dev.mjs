@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 const publicPort = Number(process.env.PORT ?? 8082);
 const expoPort = Number(process.env.EXPO_PORT ?? (publicPort === 8081 ? 8082 : 8081));
+const expoHost = 'localhost';
 const expoCli = fileURLToPath(new URL('../node_modules/expo/bin/cli', import.meta.url));
 
-const expo = spawn(process.execPath, [expoCli, 'start', '--web', '--port', String(expoPort)], {
+const expo = spawn(process.execPath, [expoCli, 'start', '--web', '--localhost', '--port', String(expoPort)], {
   cwd: process.cwd(),
   env: process.env,
   stdio: 'inherit',
@@ -23,13 +24,13 @@ const addIsolationHeaders = (headers) => ({
 const proxy = createServer((request, response) => {
   const upstream = httpRequest(
     {
-      hostname: '127.0.0.1',
+      hostname: expoHost,
       port: expoPort,
       path: request.url,
       method: request.method,
       headers: {
         ...request.headers,
-        host: `127.0.0.1:${expoPort}`,
+        host: `${expoHost}:${expoPort}`,
       },
     },
     (upstreamResponse) => {
@@ -47,7 +48,7 @@ const proxy = createServer((request, response) => {
 });
 
 proxy.on('upgrade', (request, socket, head) => {
-  const upstream = connect(expoPort, '127.0.0.1', () => {
+    const upstream = connect(expoPort, expoHost, () => {
     const headers = Object.entries(request.headers)
       .map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(', ') : value}`)
       .join('\r\n');

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/design/theme';
+import { SnackbarProvider } from '@/components/visual';
 import { initializeDatabase } from '@/database/database';
 import { getSetting, seedDefaults } from '@/database/repositories';
 import { reconcileReminders } from '@/services/notification-service';
@@ -47,26 +48,28 @@ export default function RootLayout() {
     );
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="notes/new" options={{ presentation: 'card' }} />
-        <Stack.Screen name="notes/[id]" />
-        <Stack.Screen name="tasks/new" />
-        <Stack.Screen name="tasks/[id]" />
-        <Stack.Screen name="reminders/new" />
-        <Stack.Screen name="reminders/[id]" />
-        <Stack.Screen name="calendar" />
-        <Stack.Screen name="search" />
-        <Stack.Screen name="settings/index" />
-        <Stack.Screen name="files" />
-        <Stack.Screen name="media/image" />
-        <Stack.Screen name="media/audio" />
-        <Stack.Screen name="media/preview" />
-        <Stack.Screen name="tags" />
-        <Stack.Screen name="trash" />
-      </Stack>
+      <SnackbarProvider>
+        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="notes/new" options={{ presentation: 'card' }} />
+          <Stack.Screen name="notes/[id]" />
+          <Stack.Screen name="tasks/new" />
+          <Stack.Screen name="tasks/[id]" />
+          <Stack.Screen name="reminders/new" />
+          <Stack.Screen name="reminders/[id]" />
+          <Stack.Screen name="calendar" />
+          <Stack.Screen name="search" />
+          <Stack.Screen name="settings/index" />
+          <Stack.Screen name="files" />
+          <Stack.Screen name="media/image" />
+          <Stack.Screen name="media/audio" />
+          <Stack.Screen name="media/preview" />
+          <Stack.Screen name="tags" />
+          <Stack.Screen name="trash" />
+        </Stack>
+      </SnackbarProvider>
     </SafeAreaProvider>
   );
 }

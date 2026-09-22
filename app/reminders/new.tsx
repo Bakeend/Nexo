@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/design/theme';
-import { ActionSheet, DateTimeSheet } from '@/components/visual';
+import { ActionSheet, DateTimeSheet, useSnackbar } from '@/components/visual';
 import { Header, Input, PrimaryButton } from '@/components/ui';
 import { createReminder, findReminder, updateReminder } from '@/database/repositories';
 import { cancelReminder, scheduleReminder } from '@/services/notification-service';
@@ -22,6 +22,7 @@ function timeLabel(value: Date) {
 }
 
 export default function NewReminder() {
+  const { showSnackbar } = useSnackbar();
   const params = useLocalSearchParams<{ id?: string; seed?: string }>();
   const [title, setTitle] = useState(params.seed || '');
   const [description, setDescription] = useState('');
@@ -77,6 +78,7 @@ export default function NewReminder() {
     }
     if (!reminder) return;
     await scheduleReminder(reminder);
+    showSnackbar(existingId ? 'Lembrete atualizado' : 'Lembrete criado');
     router.replace({ pathname: '/reminders/[id]', params: { id: reminder.id } });
   };
 

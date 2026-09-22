@@ -3,17 +3,18 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow } from '@/components/ui';
-import { AppDialog } from '@/components/visual';
+import { AppDialog, useSnackbar } from '@/components/visual';
 import { createAttachment, createInboxCapture } from '@/database/repositories';
 import { pickFile } from '@/services/media-service';
 export default function Files() {
+  const { showSnackbar } = useSnackbar();
   const [status, setStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     try {
       const file = await pickFile();
       if (file) {
-        const capture = await createInboxCapture(`${file.name}\n${file.uri}`, 'file');
+        const capture = await createInboxCapture(`Arquivo: ${file.name}`, 'file');
         await createAttachment({
           itemId: capture.itemId,
           itemType: 'file',
@@ -24,6 +25,7 @@ export default function Files() {
           sizeBytes: file.size,
         });
         setStatus('Arquivo salvo na Caixa de entrada');
+        showSnackbar('Arquivo anexado');
       }
     } catch {
       setError('O arquivo não foi alterado. Tente novamente.');

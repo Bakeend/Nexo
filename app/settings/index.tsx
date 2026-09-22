@@ -27,7 +27,13 @@ export default function Settings() {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Voltar" hitSlop={10} style={styles.backButton}>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          hitSlop={10}
+          style={styles.backButton}
+        >
           <Ionicons name="chevron-back" size={24} color={colors.ink} />
         </Pressable>
         <Text style={styles.title}>Configurações</Text>

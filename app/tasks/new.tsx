@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, Input, PrimaryButton, Segmented } from '@/components/ui';
-import { DateTimeSheet } from '@/components/visual';
+import { DateTimeSheet, useSnackbar } from '@/components/visual';
 import { createTask, findTask, updateTask } from '@/database/repositories';
 import type { Priority } from '@/types/domain';
 
 export default function NewTask() {
+  const { showSnackbar } = useSnackbar();
   const params = useLocalSearchParams<{ id?: string; seed?: string; relatedNoteId?: string }>();
   const [title, setTitle] = useState(params.seed || '');
   const [description, setDescription] = useState('');
@@ -32,6 +33,7 @@ export default function NewTask() {
       ? await updateTask(existingId, { title, description, priority, dueAt: date?.toISOString() || null })
       : await createTask({ title, description, priority, dueAt: date?.toISOString() || null, relatedNoteId: params.relatedNoteId || null });
     if (!task) return;
+    showSnackbar(existingId ? 'Tarefa atualizada' : 'Tarefa criada');
     router.replace({ pathname: '/tasks/[id]', params: { id: task.id } });
   };
   return (

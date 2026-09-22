@@ -13,8 +13,18 @@ export async function copyMediaToAppStorage(uri: string, name: string) {
   await ensureMediaDirectory();
   const safeName = name.replace(/[^a-z0-9._-]/gi, '_');
   const destination = `${mediaDir}${Date.now()}-${safeName || 'media'}`;
-  await FileSystem.copyAsync({ from: uri, to: destination });
+  try {
+    await FileSystem.copyAsync({ from: uri, to: destination });
+  } catch (copyError) {
+    try {
+      await FileSystem.moveAsync({ from: uri, to: destination });
+    } catch {
+      const reason = copyError instanceof Error && copyError.message ? ` ${copyError.message}` : '';
+      throw new Error(`Não foi possível salvar o arquivo selecionado.${reason}`);
+    }
+  }
   const info = await FileSystem.getInfoAsync(destination);
+  if (!info.exists) throw new Error('O arquivo selecionado não ficou disponível no armazenamento do app.');
   const size = 'size' in info && typeof info.size === 'number' ? info.size : null;
   if (size && size > maxMediaBytes) {
     await FileSystem.deleteAsync(destination, { idempotent: true });
@@ -23,14 +33,13 @@ export async function copyMediaToAppStorage(uri: string, name: string) {
   return { uri: destination, size };
 }
 export async function pickFile() {
-  await ensureMediaDirectory();
   const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
   if (result.canceled) return null;
-  const file = result.assets[0];
-  const destination = `${mediaDir}${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi, '_')}`;
+  const file = result.assets?.[0];
+  if (!file) throw new Error('Nenhum arquivo foi selecionado.');
   if (file.size && file.size > maxMediaBytes) throw new Error('O arquivo excede o limite local de 50 MB.');
-  await FileSystem.copyAsync({ from: file.uri, to: destination });
-  return { ...file, uri: destination };
+  const stored = await copyMediaToAppStorage(file.uri, file.name);
+  return { ...file, uri: stored.uri, size: file.size ?? stored.size ?? undefined };
 }
 export async function pickImage() {
   await ensureMediaDirectory();
@@ -39,9 +48,8 @@ export async function pickImage() {
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
   if (result.canceled) return null;
   const image = result.assets[0];
-  const destination = `${mediaDir}${Date.now()}-image.jpg`;
-  await FileSystem.copyAsync({ from: image.uri, to: destination });
-  return { ...image, uri: destination };
+  const stored = await copyMediaToAppStorage(image.uri, 'image.jpg');
+  return { ...image, uri: stored.uri };
 }
 export async function captureImage() {
   await ensureMediaDirectory();
@@ -50,7 +58,6 @@ export async function captureImage() {
   const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
   if (result.canceled) return null;
   const image = result.assets[0];
-  const destination = `${mediaDir}${Date.now()}-camera.jpg`;
-  await FileSystem.copyAsync({ from: image.uri, to: destination });
-  return { ...image, uri: destination };
+  const stored = await copyMediaToAppStorage(image.uri, 'camera.jpg');
+  return { ...image, uri: stored.uri };
 }

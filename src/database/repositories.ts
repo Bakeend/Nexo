@@ -46,7 +46,7 @@ export async function listNotes(): Promise<Note[]> {
     .all()) as Note[];
 }
 export async function findNote(id: string) {
-  return (await db.select().from(notes).where(eq(notes.id, id)).get()) as Note | undefined;
+  return (await db.select().from(notes).where(eq(notes.id, id)).all())[0] as Note | undefined;
 }
 export async function createNote(input: { title?: string | null; content?: string; spaceId?: string | null }) {
   const now = nowIso();
@@ -110,7 +110,7 @@ export async function listTasks(filter: 'today' | 'upcoming' | 'all' = 'all'): P
 const toTask = (row: typeof tasks.$inferSelect): Task =>
   ({ ...row, priority: row.priority as Priority, repeatRule: ruleFromDb(row.repeatRule) }) as Task;
 export async function findTask(id: string) {
-  const row = await db.select().from(tasks).where(eq(tasks.id, id)).get();
+  const row = (await db.select().from(tasks).where(eq(tasks.id, id)).all())[0];
   return row ? toTask(row) : undefined;
 }
 export async function createTask(input: {
@@ -187,7 +187,7 @@ export async function listReminders(): Promise<Reminder[]> {
   return rows.map(toReminder);
 }
 export async function findReminder(id: string) {
-  const row = await db.select().from(reminders).where(eq(reminders.id, id)).get();
+  const row = (await db.select().from(reminders).where(eq(reminders.id, id)).all())[0];
   return row ? toReminder(row) : undefined;
 }
 export async function createReminder(input: { title: string; description?: string | null; scheduledAt: string; repeatRule?: RepeatRule }) {
@@ -253,7 +253,7 @@ export async function listSpaces(): Promise<Space[]> {
     .all()) as Space[];
 }
 export async function findSpace(id: string) {
-  return (await db.select().from(spaces).where(eq(spaces.id, id)).get()) as Space | undefined;
+  return (await db.select().from(spaces).where(eq(spaces.id, id)).all())[0] as Space | undefined;
 }
 export async function createSpace(name: string, icon = 'folder') {
   const now = nowIso();
@@ -393,7 +393,12 @@ export async function listAttachments(itemId: string): Promise<Attachment[]> {
 }
 
 export async function findAttachment(id: string): Promise<Attachment | undefined> {
-  return (await db.select().from(attachments).where(eq(attachments.id, id)).get()) as Attachment | undefined;
+  return (await db.select().from(attachments).where(eq(attachments.id, id)).all())[0] as Attachment | undefined;
+}
+
+export async function updateAttachment(id: string, input: { originalName?: string | null }) {
+  await db.update(attachments).set(input).where(eq(attachments.id, id)).run();
+  return findAttachment(id);
 }
 
 export async function trashAttachment(id: string) {
@@ -416,6 +421,11 @@ export async function listInbox(): Promise<InboxItem[]> {
     .where(and(isNull(inboxItems.organizedAt), isNull(inboxItems.deletedAt)))
     .orderBy(desc(inboxItems.createdAt))
     .all()) as InboxItem[];
+}
+export function friendlyInboxTitle(rawText: string | null) {
+  const title = (rawText || 'Captura rápida').split(/\r?\n/, 1)[0].trim();
+  if (/^(file|content|blob):\/\//i.test(title) || /^[A-Za-z]:[\\/]/.test(title) || title.startsWith('/')) return 'Anexo';
+  return title || 'Captura rápida';
 }
 export async function organizeInbox(id: string) {
   await db.update(inboxItems).set({ organizedAt: nowIso() }).where(eq(inboxItems.id, id)).run();
@@ -486,7 +496,7 @@ export async function searchAll(query: string): Promise<UnifiedItem[]> {
     ...inboxRows.map((i) => ({
       id: i.id,
       type: i.itemType as InboxItem['itemType'],
-      title: i.rawText || 'Captura rápida',
+      title: friendlyInboxTitle(i.rawText),
       subtitle: 'Caixa de entrada',
       date: i.createdAt,
       spaceName: null,

@@ -3,17 +3,19 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow } from '@/components/ui';
-import { AppDialog } from '@/components/visual';
+import { AppDialog, useSnackbar } from '@/components/visual';
 import { createAttachment, createInboxCapture } from '@/database/repositories';
 import { captureImage, pickImage } from '@/services/media-service';
 export default function ImageCapture() {
+  const { showSnackbar } = useSnackbar();
   const [status, setStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const save = async (mode: 'camera' | 'gallery') => {
     try {
       const image = mode === 'camera' ? await captureImage() : await pickImage();
       if (image) {
-        const capture = await createInboxCapture(`${image.fileName || 'imagem'}\n${image.uri}`, 'image');
+        const friendlyName = image.fileName || 'Nova imagem';
+        const capture = await createInboxCapture(`Imagem: ${friendlyName}`, 'image');
         await createAttachment({
           itemId: capture.itemId,
           itemType: 'image',
@@ -24,6 +26,7 @@ export default function ImageCapture() {
           sizeBytes: image.fileSize,
         });
         setStatus('Imagem salva na Caixa de entrada');
+        showSnackbar('Imagem anexada');
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Tente novamente.');

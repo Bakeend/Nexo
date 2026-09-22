@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { addDays, addMonths, format, isSameDay, startOfWeek, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CaptureSheet } from '@/components/ui';
 import { colors, shadow, spacing, typography } from '@/design/theme';
@@ -24,6 +25,18 @@ export default function Calendar() {
     const start = startOfWeek(selected, { weekStartsOn: 0 });
     return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }, [selected]);
+
+  const dayPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderRelease: (_, gesture) => {
+          if (Math.abs(gesture.dx) < 36) return;
+          setSelected((current) => addDays(current, gesture.dx < 0 ? 1 : -1));
+        },
+      }),
+    [],
+  );
 
   const items = useMemo(
     () =>
@@ -48,43 +61,61 @@ export default function Calendar() {
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={() => router.back()} hitSlop={10} style={styles.headerButton}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+            onPress={() => router.back()}
+            hitSlop={10}
+            style={styles.headerButton}
+          >
             <Ionicons name="chevron-back" size={21} color={colors.ink} />
           </Pressable>
-          <Text style={styles.month}>{format(selected, 'MMMM')}</Text>
+          <Text style={styles.month}>{format(selected, 'MMMM', { locale: ptBR })}</Text>
         </View>
         <View style={styles.monthControls}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Mês anterior" onPress={() => moveMonth(-1)} hitSlop={10} style={styles.headerButton}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mês anterior"
+            onPress={() => moveMonth(-1)}
+            hitSlop={10}
+            style={styles.headerButton}
+          >
             <Ionicons name="chevron-back" size={19} color={colors.ink} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Próximo mês" onPress={() => moveMonth(1)} hitSlop={10} style={styles.headerButton}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Próximo mês"
+            onPress={() => moveMonth(1)}
+            hitSlop={10}
+            style={styles.headerButton}
+          >
             <Ionicons name="chevron-forward" size={19} color={colors.ink} />
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.week}>
+      <View {...dayPanResponder.panHandlers} style={styles.week} accessibilityLabel="Navegação diária do calendário">
         {weekDays.map((day, index) => {
-            const has =
-              tasks.some((task) => task.dueAt && isSameDay(new Date(task.dueAt), day)) ||
-              reminders.some((reminder) => isSameDay(new Date(reminder.scheduledAt), day));
-            const active = isSameDay(day, selected);
-            return (
-              <Pressable
-                key={day.toISOString()}
-                accessibilityRole="button"
-                accessibilityLabel={`Selecionar ${format(day, 'd MMMM')}`}
-                onPress={() => setSelected(day)}
-                style={styles.day}
-              >
-                <Text style={styles.weekLabel}>{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][index]}</Text>
-                <View style={[styles.dayNumberWrap, active && styles.dayActive]}>
-                  <Text style={[styles.dayText, active && styles.dayTextActive]}>{day.getDate()}</Text>
-                </View>
-                <View style={styles.dotSlot}>{has ? <View style={[styles.dot, active && styles.dotActive]} /> : null}</View>
-              </Pressable>
-            );
-          })}
+          const has =
+            tasks.some((task) => task.dueAt && isSameDay(new Date(task.dueAt), day)) ||
+            reminders.some((reminder) => isSameDay(new Date(reminder.scheduledAt), day));
+          const active = isSameDay(day, selected);
+          return (
+            <Pressable
+              key={day.toISOString()}
+              accessibilityRole="button"
+              accessibilityLabel={`Selecionar ${format(day, 'd MMMM', { locale: ptBR })}`}
+              onPress={() => setSelected(day)}
+              style={styles.day}
+            >
+              <Text style={styles.weekLabel}>{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][index]}</Text>
+              <View style={[styles.dayNumberWrap, active && styles.dayActive]}>
+                <Text style={[styles.dayText, active && styles.dayTextActive]}>{day.getDate()}</Text>
+              </View>
+              <View style={styles.dotSlot}>{has ? <View style={[styles.dot, active && styles.dotActive]} /> : null}</View>
+            </Pressable>
+          );
+        })}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -100,9 +131,7 @@ export default function Calendar() {
                 onPress={() => router.push({ pathname: isTask ? '/tasks/[id]' : '/reminders/[id]', params: { id: item.id } } as never)}
                 style={({ pressed }) => [styles.timelineRow, pressed && styles.rowPressed]}
               >
-                <Text style={styles.time}>
-                  {date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+                <Text style={styles.time}>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
                 <View style={[styles.timelineBar, { backgroundColor: isTask ? colors.accent : colors.success }]} />
                 <Text style={styles.timelineTitle} numberOfLines={2}>
                   {item.title}

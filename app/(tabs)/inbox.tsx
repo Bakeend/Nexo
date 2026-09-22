@@ -4,15 +4,22 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
 import { AppIcon, BottomNav, CaptureSheet, EmptyState, FloatingButton } from '@/components/ui';
-import { createNote, createTask, deleteInbox, listAttachments, listInbox, organizeInbox } from '@/database/repositories';
-import { ActionSheet } from '@/components/visual';
+import {
+  createNote,
+  createTask,
+  deleteInbox,
+  friendlyInboxTitle,
+  listAttachments,
+  listInbox,
+  organizeInbox,
+} from '@/database/repositories';
+import { ActionSheet, useSnackbar } from '@/components/visual';
 import type { InboxItem } from '@/types/domain';
 
 function formatInboxDate(value: string) {
   const date = new Date(value);
   const today = new Date();
-  const isToday =
-    date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  const isToday = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
 
   if (isToday) {
     return `Hoje, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
@@ -22,6 +29,7 @@ function formatInboxDate(value: string) {
 }
 
 export default function Inbox() {
+  const { showSnackbar } = useSnackbar();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [selected, setSelected] = useState<{ item: InboxItem; attachmentId?: string } | null>(null);
   const [open, setOpen] = useState(false);
@@ -58,7 +66,7 @@ export default function Inbox() {
               />
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
-                  {item.rawText || 'Captura rápida'}
+                  {friendlyInboxTitle(item.rawText)}
                 </Text>
                 <Text style={styles.rowSubtitle}>{formatInboxDate(item.createdAt)}</Text>
               </View>
@@ -79,7 +87,7 @@ export default function Inbox() {
       <CaptureSheet visible={open} onClose={() => setOpen(false)} onCreated={load} />
       <ActionSheet
         visible={Boolean(selected)}
-        title={selected?.item.rawText || 'Captura rápida'}
+        title={selected ? friendlyInboxTitle(selected.item.rawText) : 'Captura rápida'}
         onClose={() => setSelected(null)}
         options={[
           ...(selected?.attachmentId
@@ -97,8 +105,9 @@ export default function Inbox() {
             icon: 'document-text-outline',
             onPress: async () => {
               if (!selected) return;
-              const note = await createNote({ title: selected.item.rawText });
+              const note = await createNote({ title: friendlyInboxTitle(selected.item.rawText) });
               await organizeInbox(selected.item.id);
+              showSnackbar('Captura transformada em nota');
               setSelected(null);
               router.push({ pathname: '/notes/[id]', params: { id: note.id } });
             },
@@ -109,8 +118,9 @@ export default function Inbox() {
             icon: 'checkmark-circle-outline',
             onPress: async () => {
               if (!selected) return;
-              const task = await createTask({ title: selected.item.rawText || 'Nova tarefa' });
+              const task = await createTask({ title: friendlyInboxTitle(selected.item.rawText) || 'Nova tarefa' });
               await organizeInbox(selected.item.id);
+              showSnackbar('Captura transformada em tarefa');
               setSelected(null);
               router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
             },
@@ -125,6 +135,7 @@ export default function Inbox() {
               await deleteInbox(selected.item.id);
               setSelected(null);
               await load();
+              showSnackbar('Captura excluída');
             },
           },
         ]}
