@@ -13,7 +13,7 @@ export type RepeatRule =
 export type NoteBlock =
   | { type: 'text'; text: string }
   | { type: 'heading'; level: 1 | 2; text: string }
-  | { type: 'checklist'; text: string; checked: boolean }
+  | { type: 'checklist'; items: { id: string; text: string; checked: boolean }[] }
   | { type: 'bullet'; text: string }
   | { type: 'link'; text: string; url: string }
   | { type: 'image' | 'file' | 'audio'; attachmentId: string; label?: string };

@@ -1,13 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow, PrimaryButton, SecondaryButton } from '@/components/ui';
+import { ActionSheet, AppDialog } from '@/components/visual';
 import { findTask, toggleTask, trashTask } from '@/database/repositories';
 import type { Task } from '@/types/domain';
 export default function TaskDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [task, setTask] = useState<Task>();
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const load = useCallback(async () => {
     if (id) setTask(await findTask(id));
   }, [id]);
@@ -21,25 +24,14 @@ export default function TaskDetail() {
         <Text style={styles.muted}>Tarefa não encontrada.</Text>
       </View>
     );
-  const actions = () =>
-    Alert.alert('Ações da tarefa', undefined, [
-      { text: task.completedAt ? 'Reabrir' : 'Concluir', onPress: () => toggleTask(task.id, !task.completedAt).then(load) },
-      { text: 'Editar', onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
-      { text: 'Tags', onPress: () => router.push({ pathname: '/tags', params: { itemId: task.id, itemType: 'task' } } as never) },
-      { text: 'Duplicar', onPress: () => undefined },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          await trashTask(task.id);
-          router.back();
-        },
-      },
-      { text: 'Cancelar', style: 'cancel' },
-    ]);
+  const deleteTask = async () => {
+    setDeleteOpen(false);
+    await trashTask(task.id);
+    router.back();
+  };
   return (
     <View style={styles.root}>
-      <Header title="Tarefa" onBack={() => router.back()} action={actions} />
+      <Header title="Tarefa" onBack={() => router.back()} action={() => setActionsOpen(true)} />
       <View style={styles.content}>
         <Text style={styles.title}>{task.title}</Text>
         <Text style={styles.meta}>
@@ -60,9 +52,37 @@ export default function TaskDetail() {
             title={task.completedAt ? 'Reabrir tarefa' : 'Concluir tarefa'}
             onPress={() => toggleTask(task.id, !task.completedAt).then(load)}
           />
-          <SecondaryButton title="Excluir tarefa" onPress={() => actions()} />
+          <SecondaryButton title="Mais ações" onPress={() => setActionsOpen(true)} />
         </View>
       </View>
+      <ActionSheet
+        visible={actionsOpen}
+        title="Ações da tarefa"
+        onClose={() => setActionsOpen(false)}
+        options={[
+          {
+            label: task.completedAt ? 'Reabrir' : 'Concluir',
+            icon: task.completedAt ? 'refresh-outline' : 'checkmark-circle-outline',
+            onPress: () => toggleTask(task.id, !task.completedAt).then(load),
+          },
+          { label: 'Editar', icon: 'create-outline', onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
+          {
+            label: 'Tags',
+            icon: 'pricetags-outline',
+            onPress: () => router.push({ pathname: '/tags', params: { itemId: task.id, itemType: 'task' } } as never),
+          },
+          { label: 'Excluir', icon: 'trash-outline', destructive: true, onPress: () => setDeleteOpen(true) },
+        ]}
+      />
+      <AppDialog
+        visible={deleteOpen}
+        title="Excluir tarefa?"
+        message="A tarefa será movida para a lixeira."
+        confirmLabel="Excluir"
+        destructive
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={deleteTask}
+      />
     </View>
   );
 }

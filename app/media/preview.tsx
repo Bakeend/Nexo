@@ -3,16 +3,18 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { findAttachment } from '@/database/repositories';
 import type { Attachment } from '@/types/domain';
 import { Header, PrimaryButton, SecondaryButton } from '@/components/ui';
+import { AppDialog } from '@/components/visual';
 
 export default function MediaPreview() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [attachment, setAttachment] = useState<Attachment>();
   const [missing, setMissing] = useState(false);
+  const [openError, setOpenError] = useState(false);
   const load = useCallback(async () => {
     if (id) {
       const next = await findAttachment(id);
@@ -58,16 +60,20 @@ export default function MediaPreview() {
             <PrimaryButton
               disabled={missing}
               title="Abrir arquivo"
-              onPress={() =>
-                Linking.openURL(attachment.localPath).catch(() =>
-                  Alert.alert('Não foi possível abrir', 'O sistema não encontrou um aplicativo compatível.'),
-                )
-              }
+              onPress={() => Linking.openURL(attachment.localPath).catch(() => setOpenError(true))}
             />
           </View>
         ) : null}
         <SecondaryButton title="Voltar para a Caixa de entrada" onPress={() => router.replace('/inbox')} />
       </View>
+      <AppDialog
+        visible={openError}
+        title="Não foi possível abrir"
+        message="O sistema não encontrou um aplicativo compatível."
+        confirmLabel="Entendi"
+        onClose={() => setOpenError(false)}
+        onConfirm={() => setOpenError(false)}
+      />
     </View>
   );
 }

@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow } from '@/components/ui';
+import { AppDialog } from '@/components/visual';
 import { createAttachment, createInboxCapture } from '@/database/repositories';
 import { captureImage, pickImage } from '@/services/media-service';
 export default function ImageCapture() {
   const [status, setStatus] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const save = async (mode: 'camera' | 'gallery') => {
     try {
       const image = mode === 'camera' ? await captureImage() : await pickImage();
@@ -24,7 +26,7 @@ export default function ImageCapture() {
         setStatus('Imagem salva na Caixa de entrada');
       }
     } catch (error) {
-      Alert.alert('Não foi possível adicionar a imagem', error instanceof Error ? error.message : 'Tente novamente.');
+      setError(error instanceof Error ? error.message : 'Tente novamente.');
     }
   };
   return (
@@ -37,6 +39,14 @@ export default function ImageCapture() {
         <ListRow icon="images-outline" title="Galeria" subtitle="Escolher uma foto existente" onPress={() => save('gallery')} />
         {status ? <Text style={styles.status}>{status}</Text> : null}
       </View>
+      <AppDialog
+        visible={Boolean(error)}
+        title="Não foi possível adicionar a imagem"
+        message={error || undefined}
+        confirmLabel="Entendi"
+        onClose={() => setError(null)}
+        onConfirm={() => setError(null)}
+      />
     </View>
   );
 }

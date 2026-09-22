@@ -5,7 +5,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const publicPort = Number(process.env.PORT ?? 8082);
-const expoPort = publicPort === 8081 ? 8082 : 8081;
+const expoPort = Number(process.env.EXPO_PORT ?? (publicPort === 8081 ? 8082 : 8081));
 const expoCli = fileURLToPath(new URL('../node_modules/expo/bin/cli', import.meta.url));
 
 const expo = spawn(process.execPath, [expoCli, 'start', '--web', '--port', String(expoPort)], {

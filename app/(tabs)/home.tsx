@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
 import { BottomNav, CaptureSheet, FloatingButton, IconButton, ListRow, SectionTitle, useCapture } from '@/components/ui';
 import { listInbox, listNotes, listReminders, listSpaces, listTasks } from '@/database/repositories';
@@ -33,7 +34,7 @@ export default function Home() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.content}>
         <View style={styles.hero}>
           <View>
@@ -82,7 +83,7 @@ export default function Home() {
       <BottomNav />
       <FloatingButton onPress={openCapture} />
       <CaptureSheet visible={captureOpen} onClose={() => setCaptureOpen(false)} onCreated={load} />
-    </View>
+    </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({

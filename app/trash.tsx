@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { colors, spacing } from '@/design/theme';
 import { EmptyState, Header, ListRow } from '@/components/ui';
+import { AppDialog } from '@/components/visual';
 import { listTrash, restoreTrashItem, type TrashEntry } from '@/database/repositories';
 
 const labels: Record<TrashEntry['type'], string> = {
@@ -15,21 +16,17 @@ const labels: Record<TrashEntry['type'], string> = {
 
 export default function Trash() {
   const [items, setItems] = useState<TrashEntry[]>([]);
+  const [selected, setSelected] = useState<TrashEntry | null>(null);
   const load = useCallback(async () => setItems(await listTrash()), []);
   useEffect(() => {
     load();
   }, [load]);
-  const restore = (item: TrashEntry) =>
-    Alert.alert('Restaurar item?', `${item.title} voltará para o Nexo.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Restaurar',
-        onPress: async () => {
-          await restoreTrashItem(item);
-          await load();
-        },
-      },
-    ]);
+  const restore = async () => {
+    if (!selected) return;
+    await restoreTrashItem(selected);
+    setSelected(null);
+    await load();
+  };
   return (
     <View style={styles.root}>
       <Header title="Lixeira" onBack={() => router.back()} />
@@ -41,7 +38,7 @@ export default function Trash() {
               icon="trash-outline"
               title={item.title}
               subtitle={`${labels[item.type]} · ${new Date(item.deletedAt).toLocaleDateString('pt-BR')}`}
-              onPress={() => restore(item)}
+              onPress={() => setSelected(item)}
             />
           ))
         ) : (
@@ -52,6 +49,14 @@ export default function Trash() {
           />
         )}
       </View>
+      <AppDialog
+        visible={Boolean(selected)}
+        title="Restaurar item?"
+        message={selected ? `${selected.title} voltará para o Nexo.` : undefined}
+        confirmLabel="Restaurar"
+        onClose={() => setSelected(null)}
+        onConfirm={restore}
+      />
     </View>
   );
 }

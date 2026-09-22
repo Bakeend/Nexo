@@ -1,9 +1,9 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, Input, PrimaryButton, Segmented } from '@/components/ui';
+import { DateTimeSheet } from '@/components/visual';
 import { createTask, findTask, updateTask } from '@/database/repositories';
 import type { Priority } from '@/types/domain';
 
@@ -46,16 +46,7 @@ export default function NewTask() {
           <Text style={styles.fieldLabel}>{date ? date.toLocaleString('pt-BR') : 'Sem data'}</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
-        {showDate ? (
-          <DateTimePicker
-            value={date || new Date()}
-            mode="datetime"
-            onChange={(_, selected) => {
-              setShowDate(false);
-              if (selected) setDate(selected);
-            }}
-          />
-        ) : null}
+        <DateTimeSheet visible={showDate} value={date || new Date()} onClose={() => setShowDate(false)} onConfirm={setDate} />
         <Input value={description} onChangeText={setDescription} placeholder="Descrição opcional" multiline />
         <View style={styles.bottom}>
           <PrimaryButton title={existingId ? 'Salvar tarefa' : 'Criar tarefa'} onPress={save} disabled={!title.trim()} />

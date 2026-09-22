@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, PrimaryButton } from '@/components/ui';
+import { AppDialog } from '@/components/visual';
 import { requestNotificationPermission, reconcileReminders } from '@/services/notification-service';
 export default function NotificationsSettings() {
   const [status, setStatus] = useState('Ainda não verificado');
+  const [summary, setSummary] = useState<string | null>(null);
   return (
     <View style={styles.root}>
       <Header title="Notificações" onBack={() => router.back()} />
@@ -25,10 +27,18 @@ export default function NotificationsSettings() {
         <PrimaryButton
           title="Verificar agendamentos"
           onPress={() =>
-            reconcileReminders().then((value) => Alert.alert('Agendamentos', `${value.scheduledCount} notificações no sistema.`))
+            reconcileReminders().then((value) => setSummary(`${value.scheduledCount} notificações estão agendadas no dispositivo.`))
           }
         />
       </View>
+      <AppDialog
+        visible={Boolean(summary)}
+        title="Agendamentos"
+        message={summary || undefined}
+        confirmLabel="Entendi"
+        onClose={() => setSummary(null)}
+        onConfirm={() => setSummary(null)}
+      />
     </View>
   );
 }

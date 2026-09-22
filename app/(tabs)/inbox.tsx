@@ -1,14 +1,16 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { BottomNav, CaptureSheet, EmptyState, FloatingButton, Header, ListRow } from '@/components/ui';
 import { createNote, createTask, deleteInbox, listAttachments, listInbox, organizeInbox } from '@/database/repositories';
+import { ActionSheet } from '@/components/visual';
 import type { InboxItem } from '@/types/domain';
 import { useUIStore } from '@/stores/ui.store';
 
 export default function Inbox() {
   const [items, setItems] = useState<InboxItem[]>([]);
+  const [selected, setSelected] = useState<{ item: InboxItem; attachmentId?: string } | null>(null);
   const open = useUIStore((s) => s.captureOpen);
   const setOpen = useUIStore((s) => s.setCaptureOpen);
   const load = useCallback(async () => setItems(await listInbox()), []);
@@ -17,37 +19,7 @@ export default function Inbox() {
   }, [load]);
   const actions = async (item: InboxItem) => {
     const attachments = await listAttachments(item.itemId);
-    const openAttachment = attachments[0];
-    Alert.alert(item.rawText || 'Captura rápida', 'O que você quer fazer?', [
-      ...(openAttachment
-        ? [{ text: 'Abrir conteúdo', onPress: () => router.push({ pathname: '/media/preview', params: { id: openAttachment.id } }) }]
-        : []),
-      {
-        text: 'Transformar em nota',
-        onPress: async () => {
-          const note = await createNote({ title: item.rawText });
-          await organizeInbox(item.id);
-          router.push({ pathname: '/notes/[id]', params: { id: note.id } });
-        },
-      },
-      {
-        text: 'Transformar em tarefa',
-        onPress: async () => {
-          const task = await createTask({ title: item.rawText || 'Nova tarefa' });
-          await organizeInbox(item.id);
-          router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
-        },
-      },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteInbox(item.id);
-          load();
-        },
-      },
-      { text: 'Cancelar', style: 'cancel' },
-    ]);
+    setSelected({ item, attachmentId: attachments[0]?.id });
   };
   return (
     <View style={styles.root}>
@@ -80,6 +52,58 @@ export default function Inbox() {
       <BottomNav />
       <FloatingButton onPress={() => setOpen(true)} />
       <CaptureSheet visible={open} onClose={() => setOpen(false)} onCreated={load} />
+      <ActionSheet
+        visible={Boolean(selected)}
+        title={selected?.item.rawText || 'Captura rápida'}
+        onClose={() => setSelected(null)}
+        options={[
+          ...(selected?.attachmentId
+            ? [
+                {
+                  label: 'Abrir conteúdo',
+                  icon: 'open-outline' as const,
+                  onPress: () => router.push({ pathname: '/media/preview', params: { id: selected.attachmentId as string } }),
+                },
+              ]
+            : []),
+          {
+            label: 'Transformar em nota',
+            description: 'Continuar editando como nota',
+            icon: 'document-text-outline',
+            onPress: async () => {
+              if (!selected) return;
+              const note = await createNote({ title: selected.item.rawText });
+              await organizeInbox(selected.item.id);
+              setSelected(null);
+              router.push({ pathname: '/notes/[id]', params: { id: note.id } });
+            },
+          },
+          {
+            label: 'Transformar em tarefa',
+            description: 'Adicionar à sua lista',
+            icon: 'checkmark-circle-outline',
+            onPress: async () => {
+              if (!selected) return;
+              const task = await createTask({ title: selected.item.rawText || 'Nova tarefa' });
+              await organizeInbox(selected.item.id);
+              setSelected(null);
+              router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
+            },
+          },
+          {
+            label: 'Excluir',
+            description: 'Mover para a lixeira',
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: async () => {
+              if (!selected) return;
+              await deleteInbox(selected.item.id);
+              setSelected(null);
+              await load();
+            },
+          },
+        ]}
+      />
     </View>
   );
 }

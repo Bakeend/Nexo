@@ -2,7 +2,21 @@ import { and, desc, eq, isNotNull, isNull, like, or } from 'drizzle-orm';
 import { db } from './database';
 import { attachments, inboxItems, itemTags, notes, reminders, settings, spaces, tags, tasks } from './schema';
 import { newId, nowIso } from '@/utils/ids';
-import type { Attachment, InboxItem, ItemType, Note, Reminder, RepeatRule, Space, Task, UnifiedItem, Priority, Tag } from '@/types/domain';
+import type {
+  Attachment,
+  InboxItem,
+  ItemType,
+  Note,
+  NoteBlock,
+  Reminder,
+  RepeatRule,
+  Space,
+  Task,
+  UnifiedItem,
+  Priority,
+  Tag,
+} from '@/types/domain';
+import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 
 const ruleFromDb = (value: string | null): RepeatRule => {
   if (!value) return null;
@@ -55,6 +69,13 @@ export async function updateNote(id: string, input: Partial<Pick<Note, 'title' |
   const item = { ...input, updatedAt: nowIso() };
   await db.update(notes).set(item).where(eq(notes.id, id)).run();
   return findNote(id);
+}
+export async function appendNoteBlock(id: string, block: NoteBlock) {
+  const note = await findNote(id);
+  if (!note) return undefined;
+  const blocks = parseNoteBlocks(note.content);
+  await updateNote(id, { content: serializeNoteBlocks([...blocks, block]) });
+  return block;
 }
 export async function archiveNote(id: string) {
   await db.update(notes).set({ archivedAt: nowIso(), updatedAt: nowIso() }).where(eq(notes.id, id)).run();

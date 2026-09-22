@@ -1,19 +1,22 @@
 import { RecordingPresets, requestRecordingPermissionsAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, PrimaryButton, SecondaryButton } from '@/components/ui';
-import { createAttachment, createInboxCapture } from '@/database/repositories';
+import { AppDialog } from '@/components/visual';
+import { appendNoteBlock, createAttachment, createInboxCapture } from '@/database/repositories';
 import { copyMediaToAppStorage } from '@/services/media-service';
 export default function AudioCapture() {
+  const { noteId } = useLocalSearchParams<{ noteId?: string }>();
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const state = useAudioRecorderState(recorder);
   const [status, setStatus] = useState('');
+  const [permissionError, setPermissionError] = useState(false);
   const start = async () => {
     const permission = await requestRecordingPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permissão necessária', 'Ative o microfone para gravar um áudio.');
+      setPermissionError(true);
       return;
     }
     await recorder.prepareToRecordAsync();
@@ -24,18 +27,33 @@ export default function AudioCapture() {
     await recorder.stop();
     if (recorder.uri) {
       const audio = await copyMediaToAppStorage(recorder.uri, `audio-${Date.now()}.m4a`);
-      const capture = await createInboxCapture(`Áudio gravado\n${audio.uri}`, 'audio');
-      await createAttachment({
-        itemId: capture.itemId,
-        itemType: 'audio',
-        type: 'audio',
-        originalName: `audio-${new Date().toISOString()}.m4a`,
-        localPath: audio.uri,
-        mimeType: 'audio/m4a',
-        sizeBytes: audio.size,
-        durationMs: state.durationMillis,
-      });
-      setStatus('Áudio salvo na Caixa de entrada');
+      if (noteId) {
+        const attachment = await createAttachment({
+          itemId: noteId,
+          itemType: 'note',
+          type: 'audio',
+          originalName: `audio-${new Date().toISOString()}.m4a`,
+          localPath: audio.uri,
+          mimeType: 'audio/m4a',
+          sizeBytes: audio.size,
+          durationMs: state.durationMillis,
+        });
+        await appendNoteBlock(noteId, { type: 'audio', attachmentId: attachment.id, label: 'Áudio gravado' });
+        setStatus('Áudio inserido na nota');
+      } else {
+        const capture = await createInboxCapture(`Áudio gravado\n${audio.uri}`, 'audio');
+        await createAttachment({
+          itemId: capture.itemId,
+          itemType: 'audio',
+          type: 'audio',
+          originalName: `audio-${new Date().toISOString()}.m4a`,
+          localPath: audio.uri,
+          mimeType: 'audio/m4a',
+          sizeBytes: audio.size,
+          durationMs: state.durationMillis,
+        });
+        setStatus('Áudio salvo na Caixa de entrada');
+      }
     }
   };
   return (
@@ -60,6 +78,14 @@ export default function AudioCapture() {
           <PrimaryButton title="Começar a gravar" onPress={start} icon="mic-outline" />
         )}
       </View>
+      <AppDialog
+        visible={permissionError}
+        title="Permissão necessária"
+        message="Ative o microfone para gravar um áudio."
+        confirmLabel="Entendi"
+        onClose={() => setPermissionError(false)}
+        onConfirm={() => setPermissionError(false)}
+      />
     </View>
   );
 }

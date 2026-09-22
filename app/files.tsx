@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, ListRow } from '@/components/ui';
+import { AppDialog } from '@/components/visual';
 import { createAttachment, createInboxCapture } from '@/database/repositories';
 import { pickFile } from '@/services/media-service';
 export default function Files() {
   const [status, setStatus] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const add = async () => {
     try {
       const file = await pickFile();
@@ -24,7 +26,7 @@ export default function Files() {
         setStatus('Arquivo salvo na Caixa de entrada');
       }
     } catch {
-      Alert.alert('Não foi possível adicionar', 'O arquivo não foi alterado. Tente novamente.');
+      setError('O arquivo não foi alterado. Tente novamente.');
     }
   };
   return (
@@ -38,6 +40,14 @@ export default function Files() {
         <ListRow icon="document-attach-outline" title="Escolher arquivo" subtitle="PDF, documento ou outro formato" onPress={add} />
         {status ? <Text style={styles.status}>{status}</Text> : null}
       </View>
+      <AppDialog
+        visible={Boolean(error)}
+        title="Não foi possível adicionar"
+        message={error || undefined}
+        confirmLabel="Entendi"
+        onClose={() => setError(null)}
+        onConfirm={() => setError(null)}
+      />
     </View>
   );
 }

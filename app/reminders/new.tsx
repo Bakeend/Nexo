@@ -1,9 +1,9 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '@/design/theme';
 import { Header, Input, PrimaryButton, Segmented } from '@/components/ui';
+import { DateTimeSheet } from '@/components/visual';
 import { createReminder, findReminder, updateReminder } from '@/database/repositories';
 import { cancelReminder, scheduleReminder } from '@/services/notification-service';
 import type { RepeatRule } from '@/types/domain';
@@ -66,16 +66,7 @@ export default function NewReminder() {
           <Text style={styles.fieldLabel}>Data e horário</Text>
           <Text style={styles.fieldValue}>{date.toLocaleString('pt-BR')}</Text>
         </Pressable>
-        {showDate ? (
-          <DateTimePicker
-            value={date}
-            mode="datetime"
-            onChange={(_, selected) => {
-              setShowDate(false);
-              if (selected) setDate(selected);
-            }}
-          />
-        ) : null}
+        <DateTimeSheet visible={showDate} value={date} onClose={() => setShowDate(false)} onConfirm={setDate} />
         <Text style={styles.label}>Repetir</Text>
         <Segmented values={['Nunca', 'Diário', 'Semanal']} selected={repeat} onChange={setRepeat} />
         <Input value={description} onChangeText={setDescription} placeholder="Descrição opcional" multiline />
