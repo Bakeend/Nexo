@@ -1,12 +1,25 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
-import { BottomNav, CaptureSheet, EmptyState, FloatingButton, Header, ListRow } from '@/components/ui';
+import { AppIcon, BottomNav, CaptureSheet, EmptyState, FloatingButton } from '@/components/ui';
 import { createNote, createTask, deleteInbox, listAttachments, listInbox, organizeInbox } from '@/database/repositories';
 import { ActionSheet } from '@/components/visual';
 import type { InboxItem } from '@/types/domain';
+
+function formatInboxDate(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const isToday =
+    date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+
+  if (isToday) {
+    return `Hoje, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+}
 
 export default function Inbox() {
   const [items, setItems] = useState<InboxItem[]>([]);
@@ -22,21 +35,34 @@ export default function Inbox() {
   };
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <Header title="Caixa de entrada" action={() => setOpen(true)} actionLabel="+" />
-      <View style={styles.content}>
-        <View style={styles.count}>
-          <Text style={styles.countNumber}>{items.length}</Text>
-          <Text style={styles.countLabel}>itens ainda não organizados</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Caixa de entrada</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{items.length}</Text>
         </View>
+      </View>
+      <View style={styles.content}>
         {items.length ? (
           items.map((item) => (
-            <ListRow
+            <Pressable
               key={item.id}
-              icon={item.itemType === 'image' ? 'image-outline' : item.itemType === 'audio' ? 'mic-outline' : 'file-outline'}
-              title={item.rawText || 'Captura rápida'}
-              subtitle={`${item.itemType} · ${new Date(item.createdAt).toLocaleDateString('pt-BR')}`}
               onPress={() => actions(item)}
-            />
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
+              <AppIcon
+                name={item.itemType === 'image' ? 'image-outline' : item.itemType === 'audio' ? 'mic-outline' : 'document-outline'}
+                color={item.itemType === 'image' ? colors.accent : colors.inkSoft}
+                background={colors.surfaceMuted}
+                size={18}
+              />
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle} numberOfLines={1}>
+                  {item.rawText || 'Captura rápida'}
+                </Text>
+                <Text style={styles.rowSubtitle}>{formatInboxDate(item.createdAt)}</Text>
+              </View>
+            </Pressable>
           ))
         ) : (
           <EmptyState
@@ -107,9 +133,36 @@ export default function Inbox() {
   );
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.canvas },
-  content: { flex: 1, padding: spacing.lg, paddingBottom: 100 },
-  count: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginBottom: spacing.lg },
-  countNumber: { ...typography.title, color: colors.ink },
-  countLabel: { ...typography.body, color: colors.inkMuted },
+  root: { flex: 1, backgroundColor: colors.surface },
+  header: {
+    minHeight: 62,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  title: { ...typography.heading, color: colors.ink },
+  badge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { ...typography.caption, color: colors.inkSoft, fontWeight: '700' },
+  content: { flex: 1, paddingHorizontal: spacing.lg, paddingBottom: 100 },
+  row: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  rowPressed: { backgroundColor: colors.surfacePressed },
+  rowCopy: { flex: 1 },
+  rowTitle: { ...typography.bodyStrong, color: colors.ink },
+  rowSubtitle: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
 });

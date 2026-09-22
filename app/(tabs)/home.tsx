@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/design/theme';
-import { BottomNav, CaptureSheet, FloatingButton, IconButton, ListRow, SectionTitle } from '@/components/ui';
+import { BottomNav, CaptureSheet, FloatingButton, IconButton, ListRow } from '@/components/ui';
 import { listInbox, listNotes, listReminders, listSpaces, listTasks } from '@/database/repositories';
 
 export default function Home() {
@@ -47,7 +47,6 @@ export default function Home() {
             </Pressable>
           </View>
         </View>
-        <SectionTitle title="Seu espaço" />
         <View style={styles.list}>
           {[
             {
@@ -65,7 +64,7 @@ export default function Home() {
             { icon: 'document-text-outline' as const, title: 'Notas', subtitle: `${counts.notes} notas`, path: '/notes' },
             { icon: 'checkmark-circle-outline' as const, title: 'Tarefas', subtitle: `${counts.tasks} pendentes`, path: '/tasks' },
             { icon: 'calendar-outline' as const, title: 'Calendário', subtitle: 'Ver seu dia', path: '/calendar' },
-            { icon: 'search-outline' as const, title: 'Tudo', subtitle: `${counts.spaces} espaços · buscar conteúdo`, path: '/search' },
+            { icon: 'search-outline' as const, title: 'Tudo', subtitle: 'Ver tudo', path: '/search' },
           ].map((item) => (
             <ListRow
               key={item.title}

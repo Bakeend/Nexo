@@ -253,13 +253,13 @@ export function EmptyState({
     </View>
   );
 }
-export function FloatingButton({ onPress, label = 'Criar' }: { onPress: () => void; label?: string }) {
+export function FloatingButton({ onPress, label = 'Criar', bottom = 76 }: { onPress: () => void; label?: string; bottom?: number }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+      style={({ pressed }) => [styles.fab, { bottom }, pressed && styles.fabPressed]}
     >
       <Ionicons name="add" size={27} color={colors.accent} />
     </Pressable>
@@ -290,7 +290,6 @@ export function BottomNav() {
               size={21}
               color={active ? colors.ink : colors.inkMuted}
             />
-            <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
           </Pressable>
         );
       })}
@@ -308,6 +307,7 @@ export function CaptureSheet({ visible, onClose, onCreated }: { visible: boolean
       if (kind === 'quick_capture') {
         await createInboxCapture(text || 'Captura rápida');
         onCreated?.();
+        setText('');
         onClose();
         return;
       }
@@ -317,6 +317,7 @@ export function CaptureSheet({ visible, onClose, onCreated }: { visible: boolean
       else if (kind === 'file') router.push('/files' as never);
       else if (kind === 'image') router.push('/media/image' as never);
       else router.push('/media/audio' as never);
+      setText('');
       onClose();
     } finally {
       setBusy(false);
@@ -462,17 +463,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 72,
+    height: 60,
     backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.line,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 9,
+    paddingTop: 8,
   },
-  tab: { alignItems: 'center', gap: 3, minWidth: 58 },
-  tabLabel: { ...typography.meta, color: colors.inkMuted },
-  tabLabelActive: { color: colors.ink, fontWeight: '700' },
+  tab: { alignItems: 'center', justifyContent: 'center', minWidth: 58, minHeight: 44 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   sheet: {

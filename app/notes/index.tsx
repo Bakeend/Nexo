@@ -36,7 +36,7 @@ export default function Notes() {
           />
         )}
       </View>
-      <FloatingButton onPress={() => router.push('/notes/new')} />
+      <FloatingButton onPress={() => router.push('/notes/new')} bottom={24} />
     </View>
   );
 }

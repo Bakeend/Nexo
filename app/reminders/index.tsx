@@ -36,7 +36,7 @@ export default function Reminders() {
           />
         )}
       </View>
-      <FloatingButton onPress={() => router.push('/reminders/new')} />
+      <FloatingButton onPress={() => router.push('/reminders/new')} bottom={24} />
     </View>
   );
 }

@@ -496,16 +496,47 @@ export async function searchAll(query: string): Promise<UnifiedItem[]> {
   ];
 }
 
+const defaultSpaces = [
+  ['Pessoal', 'user'],
+  ['Faculdade', 'book'],
+  ['Trabalho', 'briefcase'],
+  ['Projetos', 'layers'],
+  ['Finanças', 'wallet'],
+] as const;
+
+let seedDefaultsPromise: Promise<void> | null = null;
+
 export async function seedDefaults() {
-  const seeded = await getSetting('seeded');
-  if (seeded) return;
-  for (const [name, icon] of [
-    ['Pessoal', 'user'],
-    ['Faculdade', 'book'],
-    ['Trabalho', 'briefcase'],
-    ['Projetos', 'layers'],
-    ['Finanças', 'wallet'],
-  ] as const)
-    await createSpace(name, icon);
-  await setSetting('seeded', 'true');
+  if (seedDefaultsPromise) return seedDefaultsPromise;
+
+  seedDefaultsPromise = (async () => {
+    const [seeded, normalized, existingSpaces] = await Promise.all([
+      getSetting('seeded'),
+      getSetting('seed_defaults_normalized'),
+      listSpaces(),
+    ]);
+
+    if (!seeded && existingSpaces.length === 0) {
+      for (const [name, icon] of defaultSpaces) await createSpace(name, icon);
+    }
+
+    if (!normalized) {
+      const currentSpaces = await listSpaces();
+      const seen = new Set<string>();
+      for (const space of [...currentSpaces].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+        if (!defaultSpaces.some(([name]) => name === space.name)) continue;
+        if (seen.has(space.name)) await trashSpace(space.id);
+        else seen.add(space.name);
+      }
+      await setSetting('seed_defaults_normalized', 'true');
+    }
+
+    await setSetting('seeded', 'true');
+  })();
+
+  try {
+    await seedDefaultsPromise;
+  } finally {
+    seedDefaultsPromise = null;
+  }
 }
