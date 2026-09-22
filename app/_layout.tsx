@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -23,11 +23,15 @@ export default function RootLayout() {
       .catch(() => setReady(true));
   }, []);
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const reminderId = response.notification.request.content.data?.reminderId;
-      if (typeof reminderId === 'string') router.push({ pathname: '/reminders/[id]', params: { id: reminderId } });
+    if (Platform.OS === 'web') return;
+    let subscription: { remove: () => void } | undefined;
+    import('expo-notifications').then((Notifications) => {
+      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        const reminderId = response.notification.request.content.data?.reminderId;
+        if (typeof reminderId === 'string') router.push({ pathname: '/reminders/[id]', params: { id: reminderId } });
+      });
     });
-    return () => subscription.remove();
+    return () => subscription?.remove();
   }, []);
   if (!ready)
     return (

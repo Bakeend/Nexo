@@ -1,25 +1,59 @@
 import * as SQLite from 'expo-sqlite';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
+import { drizzle as drizzleProxy } from 'drizzle-orm/sqlite-proxy';
+import { Platform } from 'react-native';
 import { migrations } from './migrations';
 
-const sqlite = SQLite.openDatabaseSync('nexo.db');
-export const db = drizzle(sqlite);
+type AsyncDatabase = Awaited<ReturnType<typeof SQLite.openDatabaseAsync>>;
+
+let webDatabasePromise: Promise<AsyncDatabase> | undefined;
+
+function getWebDatabase() {
+  webDatabasePromise ??= SQLite.openDatabaseAsync('nexo.db');
+  return webDatabasePromise;
+}
+
+const webDb = drizzleProxy(async (sql, params, method) => {
+  const database = await getWebDatabase();
+  const statement = await database.prepareAsync(sql);
+
+  try {
+    const result = await statement.executeForRawResultAsync(params);
+
+    if (method === 'get') {
+      const row = await result.getFirstAsync();
+      return { rows: row ? [row] : [] };
+    }
+
+    if (method === 'all' || method === 'values') {
+      return { rows: await result.getAllAsync() };
+    }
+
+    return { rows: [] };
+  } finally {
+    await statement.finalizeAsync();
+  }
+});
+
+const sqlite = Platform.OS === 'web' ? null : SQLite.openDatabaseSync('nexo.db');
+export const db = (Platform.OS === 'web' ? webDb : drizzle(sqlite!)) as ReturnType<typeof drizzle>;
 let initialized = false;
 
 export async function initializeDatabase() {
   if (initialized) return;
-  await sqlite.execAsync('PRAGMA foreign_keys = ON;');
-  await sqlite.execAsync(
+  const database = Platform.OS === 'web' ? await getWebDatabase() : sqlite!;
+  await database.execAsync('PRAGMA foreign_keys = ON;');
+  await database.execAsync(
     'CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL, applied_at TEXT NOT NULL);',
   );
   for (const migration of migrations) {
-    const applied = await sqlite.getFirstAsync<{ version: number }>(
+    const applied = await database.getFirstAsync<{ version: number }>(
       'SELECT version FROM schema_migrations WHERE version = ?',
       migration.version,
     );
     if (applied) continue;
-    await sqlite.execAsync(migration.sql);
-    await sqlite.runAsync(
+    await database.execAsync(migration.sql);
+    await database.runAsync(
       'INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)',
       migration.version,
       migration.name,

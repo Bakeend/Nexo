@@ -8,7 +8,15 @@
     "userInterfaceStyle": "automatic",
     "scheme": "nexo",
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "headers": {
+            "Cross-Origin-Embedder-Policy": "credentialless",
+            "Cross-Origin-Opener-Policy": "same-origin"
+          }
+        }
+      ],
       "expo-sqlite",
       "expo-audio",
       "expo-sharing",

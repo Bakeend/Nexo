@@ -16,6 +16,7 @@ Aplicativo pessoal mobile para capturar, organizar e lembrar do que importa.
 ```bash
 npm install
 npm start
+npm run web
 npm run typecheck
 npm run lint
 npm test
