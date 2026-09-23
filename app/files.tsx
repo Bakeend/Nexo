@@ -23,7 +23,11 @@ export default function Files() {
   useEffect(() => {
     if (!status || processing) return;
     successProgress.setValue(0);
-    Animated.timing(successProgress, { toValue: 1, duration: reducedMotion ? 80 : motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }).start();
+    Animated.timing(successProgress, {
+      toValue: 1,
+      duration: reducedMotion ? 80 : motionDuration.normal,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
   }, [processing, reducedMotion, status, successProgress]);
   const add = async () => {
     if (processing) return;

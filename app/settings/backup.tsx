@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
+import { spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import { Header, PrimaryButton, SecondaryButton } from '@/components/ui';
 import { AppDialog } from '@/components/visual';
 import { createBackup, restoreBackup, validateBackup } from '@/services/backup-service';
@@ -28,10 +28,11 @@ export default function Backup() {
       playUISound('success-tick');
       setFeedback({ message: 'Backup exportado', tone: 'success' });
       setDialog({ title: 'Backup exportado', message: uri });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível criar o backup.';
       playUISound('error-soft');
       setFeedback({ message: 'Não foi possível exportar o backup', tone: 'error' });
-      setDialog({ title: 'Erro', message: 'Não foi possível criar o backup.' });
+      setDialog({ title: 'Erro', message });
     } finally {
       setBusy(null);
     }
@@ -44,10 +45,11 @@ export default function Backup() {
       if (result.canceled) return;
       const payload = await validateBackup(result.assets[0].uri);
       setPendingRestore(payload);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'O arquivo não alterou seus dados.';
       playUISound('error-soft');
       setFeedback({ message: 'Arquivo inválido', tone: 'error' });
-      setDialog({ title: 'Backup inválido', message: 'O arquivo não alterou seus dados. Escolha um backup do Nexo.' });
+      setDialog({ title: 'Backup inválido', message });
     } finally {
       setBusy(null);
     }
@@ -59,16 +61,24 @@ export default function Backup() {
     setPendingRestore(null);
     setBusy('restore');
     try {
-      await restoreBackup(pendingRestore);
+      const result = await restoreBackup(pendingRestore);
       setRestoreStep('reminders');
       await reconcileReminders();
       playUISound('success-tick');
       setFeedback({ message: 'Backup restaurado', tone: 'success' });
-      setDialog({ title: 'Backup restaurado', message: 'Os dados foram restaurados e os lembretes foram reconciliados.' });
-    } catch {
+      const legacyCount = result.legacyAttachmentsOmitted;
+      const legacyNotice = legacyCount
+        ? ` ${legacyCount} ${legacyCount === 1 ? 'anexo de um backup antigo foi ignorado' : 'anexos de um backup antigo foram ignorados'} porque o arquivo não incluía o conteúdo físico.`
+        : '';
+      setDialog({
+        title: 'Backup restaurado',
+        message: `Os dados foram restaurados e os lembretes foram reconciliados.${legacyNotice}`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível restaurar o backup. Tente novamente.';
       playUISound('error-soft');
       setFeedback({ message: 'Não foi possível restaurar o backup', tone: 'error' });
-      setDialog({ title: 'Erro ao restaurar', message: 'Não foi possível restaurar o backup. Tente novamente.' });
+      setDialog({ title: 'Erro ao restaurar', message });
     } finally {
       setBusy(null);
     }

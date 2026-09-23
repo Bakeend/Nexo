@@ -13,6 +13,7 @@ import { AnimatedListItem } from '@/motion/AnimatedListItem';
 import { animateListLayout } from '@/motion/layout';
 import { motionDuration, motionSpring } from '@/motion/tokens';
 import { useReducedMotion } from '@/motion/useReducedMotion';
+import { goBackOrHome } from '@/navigation/back';
 
 function ReminderMotionRow({
   item,
@@ -114,7 +115,13 @@ export default function Reminders() {
   );
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <Header title="Lembretes" action={() => router.push('/reminders/new')} actionLabel="+" />
+      <Header
+        title="Lembretes"
+        onBack={goBackOrHome}
+        action={() => router.push('/reminders/new')}
+        actionIcon="add"
+        actionLabel="Novo lembrete"
+      />
       <View style={styles.content}>
         {items.length ? (
           items.map((item) => (

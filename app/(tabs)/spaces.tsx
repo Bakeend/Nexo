@@ -3,8 +3,10 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomNav, CaptureSheet } from '@/components/ui';
-import { listNotes, listSpaces, listTasks } from '@/database/repositories';
+import { BottomNav, CaptureSheet, IconButton } from '@/components/ui';
+import { listNotes, listSpaces, listTasks, setPinnedItem } from '@/database/repositories';
+import { LongPressItem } from '@/components/long-press-item';
+import { useSnackbar } from '@/components/visual';
 import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import type { Space } from '@/types/domain';
 import { AnimatedListItem } from '@/motion/AnimatedListItem';
@@ -37,6 +39,7 @@ export default function Spaces() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
+  const { showSnackbar } = useSnackbar();
 
   const load = useCallback(async () => {
     const [nextSpaces, notes, tasks] = await Promise.all([listSpaces(), listNotes(), listTasks('all')]);
@@ -61,10 +64,9 @@ export default function Spaces() {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
+        <IconButton icon="chevron-back" label="Voltar" onPress={() => router.replace('/home')} />
         <Text style={styles.title}>Espaços</Text>
-        <Pressable onPress={add} accessibilityRole="button" accessibilityLabel="Novo espaço" hitSlop={10} style={styles.headerAction}>
-          <Ionicons name="add" size={27} color={colors.ink} />
-        </Pressable>
+        <IconButton icon="add" size={27} label="Novo espaço" onPress={add} />
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 88 + insets.bottom }} showsVerticalScrollIndicator={false}>
@@ -72,10 +74,22 @@ export default function Spaces() {
           const icon = iconForSpace(space);
           return (
             <AnimatedListItem key={space.id}>
-              <Pressable
+              <LongPressItem
+                title={space.name}
+                actions={[
+                  {
+                    label: space.pinned ? 'Desafixar' : 'Fixar',
+                    icon: space.pinned ? 'pin-outline' : 'pin',
+                    onPress: async () => {
+                      await setPinnedItem('space', space.id, !space.pinned);
+                      showSnackbar(space.pinned ? 'Espaço desafixado' : 'Espaço fixado', 'info');
+                      await load();
+                    },
+                  },
+                ]}
                 onPress={() => router.push({ pathname: '/spaces/[id]', params: { id: space.id } })}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                style={styles.row}
+                pressedStyle={styles.rowPressed}
               >
                 <View style={styles.iconWrap}>
                   <Ionicons name={icon.name} size={18} color={icon.color} />
@@ -84,7 +98,7 @@ export default function Spaces() {
                   {space.name}
                 </Text>
                 <Text style={styles.count}>{counts[space.id] ?? 0}</Text>
-              </Pressable>
+              </LongPressItem>
             </AnimatedListItem>
           );
         })}
@@ -113,13 +127,7 @@ const makeStyles = (colors: AppColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    title: { ...typography.heading, color: colors.ink },
-    headerAction: {
-      width: 36,
-      height: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+    title: { ...typography.heading, flex: 1, color: colors.ink },
     content: { flex: 1, paddingHorizontal: spacing.lg },
     row: {
       minHeight: 54,

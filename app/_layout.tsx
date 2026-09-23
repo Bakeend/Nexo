@@ -80,6 +80,7 @@ export default function RootLayout() {
             <Stack.Screen name="calendar" />
             <Stack.Screen name="search" />
             <Stack.Screen name="settings/index" />
+            <Stack.Screen name="settings/storage" />
             <Stack.Screen name="files" />
             <Stack.Screen name="media/image" />
             <Stack.Screen name="media/audio" />

@@ -4,8 +4,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
-import { BottomNav, CaptureSheet, EmptyState } from '@/components/ui';
+import { colors, radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
+import { BottomNav, CaptureSheet, EmptyState, IconButton } from '@/components/ui';
 import { completeReminder, listReminders, listTasks, toggleTask, trashReminder, trashTask, updateTask } from '@/database/repositories';
 import type { Reminder, Task } from '@/types/domain';
 import { LongPressItem } from '@/components/long-press-item';
@@ -259,18 +259,28 @@ export default function Today() {
   const formattedDate = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
   const nextTask = tasks[0];
 
+  const taskTimeLabel = (task: Task) => {
+    if (!task.dueAt) return 'Sem horário';
+    const due = new Date(task.dueAt);
+    const time = due.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return due.toDateString() === new Date().toDateString() ? `Hoje · ${time}` : `${due.toLocaleDateString('pt-BR')} · ${time}`;
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 88 + insets.bottom }]} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Hoje</Text>
-          <Text style={styles.date}>{formattedDate}</Text>
+          <IconButton icon="chevron-back" label="Voltar" onPress={() => router.replace('/home')} />
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>Hoje</Text>
+            <Text style={styles.date}>{formattedDate}</Text>
+          </View>
         </View>
         <View style={styles.stats}>
           {[
             [tasks.length, 'Tarefas'],
             [reminders.length, reminders.length === 1 ? 'Lembrete' : 'Lembretes'],
-            [tasks.length + reminders.length, 'Eventos'],
+            [tasks.length + reminders.length, 'Itens'],
           ].map(([value, label]) => (
             <View key={String(label)} style={styles.stat}>
               <Text style={styles.statValue}>{value}</Text>
@@ -287,18 +297,16 @@ export default function Today() {
             style={styles.nextRow}
             pressedStyle={styles.rowPressed}
           >
-            <Ionicons name="radio-button-on-outline" size={17} color={colors.accent} />
-            <Text style={styles.nextTitle} numberOfLines={1}>
-              {nextTask.title}
-            </Text>
-            <View style={styles.nextMeta}>
-              <Ionicons name="arrow-forward" size={11} color={colors.inkMuted} />
-              <Text style={styles.nextTime}>
-                {nextTask.dueAt
-                  ? new Date(nextTask.dueAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                  : 'Sem horário'}
-              </Text>
+            <View style={styles.nextIcon}>
+              <Ionicons name="arrow-forward" size={19} color={colors.accent} />
             </View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.nextTitle} numberOfLines={2}>
+                {nextTask.title}
+              </Text>
+              <Text style={styles.nextTime}>{taskTimeLabel(nextTask)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
           </LongPressItem>
         ) : (
           <Text style={styles.emptyLine}>Nada agendado por enquanto.</Text>
@@ -322,9 +330,13 @@ export default function Today() {
                 pressedStyle={styles.rowPressed}
               >
                 <Checkbox checked={completingTaskIds.has(task.id)} label={task.title} onPress={() => startTaskCompletion(task, false)} />
-                <Text style={[styles.taskTitle, completingTaskIds.has(task.id) && styles.completedTask]} numberOfLines={1}>
-                  {task.title}
-                </Text>
+                <View style={styles.rowCopy}>
+                  <Text style={[styles.taskTitle, completingTaskIds.has(task.id) && styles.completedTask]} numberOfLines={2}>
+                    {task.title}
+                  </Text>
+                  <Text style={styles.taskMeta}>{taskTimeLabel(task)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
               </LongPressItem>
             </AnimatedListItem>
           ))
@@ -354,17 +366,22 @@ export default function Today() {
                   style={styles.taskRow}
                   pressedStyle={styles.rowPressed}
                 >
-                  <Ionicons
-                    name={completingReminderIds.has(item.id) ? 'checkmark-circle-outline' : 'notifications-outline'}
-                    size={18}
-                    color={colors.inkSoft}
-                  />
-                  <Text style={[styles.taskTitle, completingReminderIds.has(item.id) && styles.completedTask]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.reminderTime}>
-                    {new Date(item.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+                  <View style={styles.reminderIcon}>
+                    <Ionicons
+                      name={completingReminderIds.has(item.id) ? 'checkmark-circle-outline' : 'notifications-outline'}
+                      size={20}
+                      color={colors.warning}
+                    />
+                  </View>
+                  <View style={styles.rowCopy}>
+                    <Text style={[styles.taskTitle, completingReminderIds.has(item.id) && styles.completedTask]} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.reminderTime}>
+                      {new Date(item.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
                 </LongPressItem>
               </AnimatedListItem>
             ))}
@@ -380,16 +397,17 @@ const makeStyles = (colors: AppColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.surface },
     content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 112 },
-    header: { marginBottom: spacing.md },
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+    headerCopy: { flex: 1 },
     title: { ...typography.heading, fontSize: 20, lineHeight: 25, color: colors.ink },
     date: { ...typography.caption, color: colors.inkMuted, marginTop: 1 },
-    stats: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+    stats: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
     stat: {
       flex: 1,
       minHeight: 66,
       justifyContent: 'center',
       backgroundColor: colors.surfaceMuted,
-      borderRadius: 12,
+      borderRadius: radius.md,
       paddingHorizontal: spacing.md,
       paddingVertical: 10,
     },
@@ -400,38 +418,65 @@ const makeStyles = (colors: AppColors) =>
       lineHeight: 18,
       fontWeight: '800',
       color: colors.ink,
-      marginTop: spacing.sm,
-      marginBottom: 4,
+      marginTop: spacing.lg,
+      marginBottom: spacing.md,
     },
     nextRow: {
-      minHeight: 42,
+      minHeight: 78,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.line,
+      gap: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      marginBottom: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.accentSoft,
+      backgroundColor: colors.accentSoft,
     },
-    nextTitle: { flex: 1, ...typography.caption, fontWeight: '700', color: colors.ink },
-    nextMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    nextTime: { ...typography.meta, color: colors.inkMuted },
+    nextIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    nextTitle: { ...typography.bodyStrong, color: colors.ink },
+    nextTime: { ...typography.caption, color: colors.inkSoft, marginTop: spacing.xs },
     taskRow: {
-      minHeight: 39,
+      minHeight: 78,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.line,
+      gap: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      marginBottom: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.line,
+      backgroundColor: colors.surfaceMuted,
     },
-    taskTitle: { flex: 1, ...typography.caption, fontSize: 13, color: colors.ink },
+    rowCopy: { flex: 1, minWidth: 0, justifyContent: 'center' },
+    taskTitle: { ...typography.bodyStrong, color: colors.ink },
+    taskMeta: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
     completedTask: { textDecorationLine: 'line-through', color: colors.inkMuted },
-    reminderTime: { ...typography.meta, color: colors.inkMuted },
+    reminderIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.warningSoft,
+    },
+    reminderTime: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
     rowPressed: { backgroundColor: colors.surfacePressed },
     emptyLine: {
       ...typography.caption,
       color: colors.inkMuted,
-      paddingVertical: spacing.md,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.line,
+      padding: spacing.lg,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceMuted,
     },
     muted: { ...typography.body, color: colors.inkMuted },
   });

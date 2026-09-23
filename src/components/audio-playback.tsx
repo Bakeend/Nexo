@@ -29,33 +29,62 @@ export function AudioPlaybackProvider({ children }: PropsWithChildren) {
   const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(null);
   const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(null);
   const requestRef = useRef(0);
+  const [playerRequestId, setPlayerRequestId] = useState<number | null>(null);
+  const playerErrorRequestRef = useRef<{
+    requestId: number;
+    attachmentId: string;
+    errorCleared: boolean;
+    errorHandled: boolean;
+  } | null>(null);
+  const latestPlayerErrorRef = useRef(status.error);
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    latestPlayerErrorRef.current = status.error;
+  }, [status.error]);
+
+  useEffect(() => {
+    const playerErrorRequest = playerErrorRequestRef.current;
+    if (playerErrorRequest && playerErrorRequest.requestId === playerRequestId && playerErrorRequest.requestId === requestRef.current) {
+      if (!status.error) playerErrorRequest.errorCleared = true;
+      if (
+        status.error &&
+        playerErrorRequest.errorCleared &&
+        !playerErrorRequest.errorHandled &&
+        playerErrorRequest.attachmentId === currentAttachmentId
+      ) {
+        playerErrorRequest.errorHandled = true;
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+        setLoadingAttachmentId(null);
+        setErrorAttachmentId(currentAttachmentId);
+        player.pause();
+      }
+    }
+
     if (status.playing && loadingAttachmentId) {
       setLoadingAttachmentId(null);
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
       loadingTimerRef.current = null;
     }
-    if (status.error && currentAttachmentId && loadingAttachmentId !== currentAttachmentId) {
-      setErrorAttachmentId(currentAttachmentId);
-      setLoadingAttachmentId(null);
-      player.pause();
-    }
     if (status.didJustFinish && currentAttachmentId && loadingAttachmentId !== currentAttachmentId) {
       setCurrentAttachmentId(null);
       setLoadingAttachmentId(null);
       setErrorAttachmentId(null);
+      playerErrorRequestRef.current = null;
+      setPlayerRequestId(null);
       player.pause();
       player.seekTo(0).catch(() => undefined);
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
       loadingTimerRef.current = null;
     }
-  }, [currentAttachmentId, loadingAttachmentId, player, status.didJustFinish, status.error, status.playing]);
+  }, [currentAttachmentId, loadingAttachmentId, player, playerRequestId, status.didJustFinish, status.error, status.playing]);
 
   useEffect(
     () => () => {
+      requestRef.current += 1;
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
     },
     [],
   );
@@ -84,7 +113,10 @@ export function AudioPlaybackProvider({ children }: PropsWithChildren) {
       }
 
       const request = ++requestRef.current;
+      playerErrorRequestRef.current = null;
+      setPlayerRequestId(null);
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
       setCurrentAttachmentId(attachmentId);
       setLoadingAttachmentId(attachmentId);
       setErrorAttachmentId(null);
@@ -92,15 +124,27 @@ export function AudioPlaybackProvider({ children }: PropsWithChildren) {
 
       try {
         const attachment = await findAttachment(attachmentId);
+        if (request !== requestRef.current) return;
         if (!attachment || attachment.type !== 'audio') throw new Error('Gravação não encontrada.');
         const resolvedUri = await resolveMediaUri(attachment.localPath);
         if (!resolvedUri) throw new Error('O arquivo de áudio não está disponível neste dispositivo.');
         if (request !== requestRef.current) return;
 
+        const errorCleared = latestPlayerErrorRef.current === null;
         player.replace(resolvedUri);
+        playerErrorRequestRef.current = {
+          requestId: request,
+          attachmentId,
+          errorCleared,
+          errorHandled: false,
+        };
+        setPlayerRequestId(request);
         player.play();
         loadingTimerRef.current = setTimeout(() => {
           if (request !== requestRef.current) return;
+          loadingTimerRef.current = null;
+          const playerErrorRequest = playerErrorRequestRef.current;
+          if (playerErrorRequest?.requestId === request) playerErrorRequest.errorHandled = true;
           player.pause();
           setLoadingAttachmentId(null);
           setErrorAttachmentId(attachmentId);
@@ -118,6 +162,8 @@ export function AudioPlaybackProvider({ children }: PropsWithChildren) {
     (attachmentId?: string) => {
       if (!currentAttachmentId || (attachmentId && currentAttachmentId !== attachmentId)) return;
       requestRef.current += 1;
+      playerErrorRequestRef.current = null;
+      setPlayerRequestId(null);
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
       loadingTimerRef.current = null;
       player.pause();

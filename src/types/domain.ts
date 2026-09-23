@@ -46,6 +46,7 @@ export type Task = {
   parentSeriesId: string | null;
   spaceId: string | null;
   relatedNoteId: string | null;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -75,6 +76,7 @@ export type Space = {
   id: string;
   name: string;
   icon: string | null;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -92,8 +94,17 @@ export type Attachment = {
   sizeBytes: number | null;
   thumbnailPath: string | null;
   durationMs: number | null;
+  pinned?: boolean;
   createdAt: string;
   deletedAt: string | null;
+};
+export type PinnedItemType = 'note' | 'task' | 'file' | 'space';
+export type PinnedItem = {
+  id: string;
+  type: PinnedItemType;
+  title: string;
+  subtitle: string;
+  date: string;
 };
 export type InboxItem = {
   id: string;

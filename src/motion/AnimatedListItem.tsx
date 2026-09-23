@@ -24,9 +24,21 @@ export function AnimatedListItem({ children, style, exiting = false, onExitCompl
   useEffect(() => {
     if (exiting) {
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 0, duration: reducedMotion ? 90 : motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(translateY, { toValue: 3, duration: reducedMotion ? 90 : motionDuration.fast, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(scale, { toValue: 0.98, duration: reducedMotion ? 90 : motionDuration.fast, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: reducedMotion ? 90 : motionDuration.normal,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(translateY, {
+          toValue: 3,
+          duration: reducedMotion ? 90 : motionDuration.fast,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(scale, {
+          toValue: 0.98,
+          duration: reducedMotion ? 90 : motionDuration.fast,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
       ]).start(({ finished }) => {
         if (finished) exitCompleteRef.current?.();
       });
@@ -36,9 +48,21 @@ export function AnimatedListItem({ children, style, exiting = false, onExitCompl
     Animated.sequence([
       Animated.delay(reducedMotion ? 0 : delay),
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: reducedMotion ? 100 : motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(translateY, { toValue: 0, duration: reducedMotion ? 100 : motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(scale, { toValue: 1, duration: reducedMotion ? 100 : motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: reducedMotion ? 100 : motionDuration.normal,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: reducedMotion ? 100 : motionDuration.normal,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: reducedMotion ? 100 : motionDuration.normal,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
       ]),
     ]).start();
   }, [delay, exiting, opacity, reducedMotion, scale, translateY]);

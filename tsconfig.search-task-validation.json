@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/database/repositories.ts",
+    "app/tasks/index.tsx",
+    "app/(tabs)/home.tsx",
+    "src/features/search/search-helpers.ts",
+    "src/features/tasks/task-date-filter.ts",
+    "tests/search-helpers.test.ts",
+    "tests/task-date-filter.test.ts",
+    "tests/search-repository.test.ts"
+  ]
+}

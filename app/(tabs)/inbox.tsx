@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
-import { AppIcon, BottomNav, CaptureSheet, EmptyState } from '@/components/ui';
+import { AppIcon, BottomNav, CaptureSheet, EmptyState, IconButton } from '@/components/ui';
 import {
   createNote,
   createTask,
@@ -153,7 +153,10 @@ export default function Inbox() {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.title}>Caixa de entrada</Text>
+        <IconButton icon="chevron-back" label="Voltar" onPress={() => router.replace('/home')} />
+        <Text style={styles.title} numberOfLines={1}>
+          Caixa de entrada
+        </Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{items.length}</Text>
         </View>
@@ -238,9 +241,9 @@ const makeStyles = (colors: AppColors) =>
       paddingHorizontal: spacing.lg,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: spacing.sm,
     },
-    title: { ...typography.heading, color: colors.ink },
+    title: { ...typography.heading, flex: 1, color: colors.ink },
     badge: {
       minWidth: 28,
       height: 28,

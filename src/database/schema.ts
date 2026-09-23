@@ -4,6 +4,7 @@ export const spaces = sqliteTable('spaces', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   icon: text('icon'),
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   archivedAt: text('archived_at'),
@@ -33,6 +34,7 @@ export const tasks = sqliteTable('tasks', {
   parentSeriesId: text('parent_series_id'),
   spaceId: text('space_id'),
   relatedNoteId: text('related_note_id'),
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   archivedAt: text('archived_at'),
@@ -79,6 +81,7 @@ export const attachments = sqliteTable('attachments', {
   sizeBytes: integer('size_bytes'),
   thumbnailPath: text('thumbnail_path'),
   durationMs: integer('duration_ms'),
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull(),
   deletedAt: text('deleted_at'),
 });

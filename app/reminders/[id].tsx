@@ -39,7 +39,11 @@ export default function ReminderDetail() {
       enabledProgress.setValue(reminder.enabled ? 1 : 0);
       return;
     }
-    Animated.spring(enabledProgress, { toValue: reminder.enabled ? 1 : 0, ...motionSpring.selection, useNativeDriver: Platform.OS !== 'web' }).start();
+    Animated.spring(enabledProgress, {
+      toValue: reminder.enabled ? 1 : 0,
+      ...motionSpring.selection,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
   }, [enabledProgress, reducedMotion, reminder]);
   const onOpacity = enabledProgress;
   const offOpacity = enabledProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });

@@ -1,6 +1,7 @@
 plano.md
 node_modules
 .nexo-scaffold
+.kilo/worktrees/
 package-lock.json
 dist
 build

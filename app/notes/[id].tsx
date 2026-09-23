@@ -144,6 +144,16 @@ export default function NoteDetail() {
           actions={[
             { label: 'Editar', icon: 'create-outline', onPress: openEditor },
             {
+              label: 'Criar tarefa vinculada',
+              description: 'Usar esta nota como contexto da tarefa',
+              icon: 'checkmark-circle-outline',
+              onPress: () =>
+                router.push({
+                  pathname: '/tasks/new',
+                  params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '' },
+                }),
+            },
+            {
               label: 'Tags',
               icon: 'pricetags-outline',
               onPress: () => router.push({ pathname: '/tags', params: { itemId: note.id, itemType: 'note' } } as never),

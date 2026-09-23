@@ -48,7 +48,7 @@ const proxy = createServer((request, response) => {
 });
 
 proxy.on('upgrade', (request, socket, head) => {
-    const upstream = connect(expoPort, expoHost, () => {
+  const upstream = connect(expoPort, expoHost, () => {
     const headers = Object.entries(request.headers)
       .map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(', ') : value}`)
       .join('\r\n');

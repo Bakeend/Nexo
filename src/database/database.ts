@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { drizzle as drizzleProxy } from 'drizzle-orm/sqlite-proxy';
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { migrations } from './migrations';
 
 type AsyncDatabase = Awaited<ReturnType<typeof SQLite.openDatabaseAsync>>;
@@ -38,6 +39,16 @@ const webDb = drizzleProxy(async (sql, params, method) => {
 const sqlite = Platform.OS === 'web' ? null : SQLite.openDatabaseSync('nexo.db');
 export const db = (Platform.OS === 'web' ? webDb : drizzle(sqlite!)) as ReturnType<typeof drizzle>;
 let initialized = false;
+
+export async function getDatabaseSizeBytes(): Promise<number> {
+  if (Platform.OS === 'web') return (await (await getWebDatabase()).serializeAsync()).byteLength;
+  const directory = SQLite.defaultDatabaseDirectory.replace(/\/$/, '');
+  const uriDirectory = directory.startsWith('file://') ? directory : `file://${directory}`;
+  const files = await Promise.all(
+    ['nexo.db', 'nexo.db-wal', 'nexo.db-shm'].map((name) => FileSystem.getInfoAsync(`${uriDirectory}/${name}`)),
+  );
+  return files.reduce((total, info) => total + (info.exists && 'size' in info && typeof info.size === 'number' ? info.size : 0), 0);
+}
 
 export async function initializeDatabase() {
   if (initialized) return;

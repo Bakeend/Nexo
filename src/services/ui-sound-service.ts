@@ -1,4 +1,5 @@
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { Platform } from 'react-native';
 import { useUIStore } from '@/stores/ui.store';
 import { isSingleTypedCharacter } from '@/utils/typing-sound';
 
@@ -76,7 +77,7 @@ export function preloadTypingSound() {
   if (!useUIStore.getState().typingSoundEnabled) return;
   while (typingPlayers.length < 2) {
     const player = createAudioPlayer(typingSource, { updateInterval: 100 });
-    player.volume = 0.22;
+    player.volume = 0.65;
     typingPlayers.push(player);
   }
 }
@@ -93,6 +94,12 @@ export function playTypingSound(previous: string, next: string) {
   try {
     preloadTypingSound();
     const player = typingPlayers[typingPlayerIndex++ % typingPlayers.length];
+    if (Platform.OS === 'web') {
+      // Start playback in the input event so browsers allow the sound.
+      void player.seekTo(0).catch(() => undefined);
+      player.play();
+      return;
+    }
     void player
       .seekTo(0)
       .then(() => {

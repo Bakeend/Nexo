@@ -163,7 +163,11 @@ export default function Onboarding() {
     setTransitioning(true);
     const duration = reducedMotion ? 80 : 90;
     Animated.parallel([
-      Animated.timing(contentTranslateX, { toValue: reducedMotion ? 0 : -direction.current * 36, duration, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(contentTranslateX, {
+        toValue: reducedMotion ? 0 : -direction.current * 36,
+        duration,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
       Animated.timing(titleProgress, { toValue: 0, duration, useNativeDriver: Platform.OS !== 'web' }),
       Animated.timing(textProgress, { toValue: 0, duration, useNativeDriver: Platform.OS !== 'web' }),
       Animated.timing(visualProgress, { toValue: 0, duration, useNativeDriver: Platform.OS !== 'web' }),

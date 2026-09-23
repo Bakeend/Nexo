@@ -8,11 +8,19 @@ import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppCo
 import { Header, ListRow, PrimaryButton } from '@/components/ui';
 import { LongPressItem } from '@/components/long-press-item';
 import { useItemActions, useSnackbar } from '@/components/visual';
-import { findTask, toggleTask, trashTask, updateTask } from '@/database/repositories';
+import { findTask, setPinnedItem, toggleTask, trashTask, updateTask } from '@/database/repositories';
 import type { Task } from '@/types/domain';
 import { playUISound } from '@/services/ui-sound-service';
 import { motionDuration, motionSpring } from '@/motion/tokens';
 import { useReducedMotion } from '@/motion/useReducedMotion';
+
+const priorityLabels: Record<Task['priority'], string> = {
+  none: 'normal',
+  low: 'baixa',
+  medium: 'média',
+  high: 'alta',
+};
+
 export default function TaskDetail() {
   const styles = useThemeStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -90,6 +98,15 @@ export default function TaskDetail() {
               icon: task.completedAt ? 'refresh-outline' : 'checkmark-circle-outline',
               onPress: toggle,
             },
+            {
+              label: task.pinned ? 'Desafixar' : 'Fixar',
+              icon: task.pinned ? 'pin-outline' : 'pin',
+              onPress: async () => {
+                await setPinnedItem('task', task.id, !task.pinned);
+                showSnackbar(task.pinned ? 'Tarefa desafixada' : 'Tarefa fixada', 'info');
+                await load();
+              },
+            },
             { label: 'Editar', icon: 'create-outline', onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
             { label: 'Adiar para amanhã', icon: 'time-outline', onPress: postpone },
             {
@@ -113,7 +130,7 @@ export default function TaskDetail() {
         >
           <Text style={[styles.title, (previewCompleted ?? Boolean(task.completedAt)) && styles.completedTitle]}>{task.title}</Text>
           <Text style={styles.meta}>
-            {task.completedAt ? 'Concluída' : 'Pendente'} · {task.priority === 'none' ? 'Prioridade normal' : `Prioridade ${task.priority}`}
+            {task.completedAt ? 'Concluída' : 'Pendente'} · Prioridade {priorityLabels[task.priority]}
           </Text>
         </LongPressItem>
         <ListRow icon="calendar-outline" title="Data" subtitle={task.dueAt ? new Date(task.dueAt).toLocaleString('pt-BR') : 'Sem data'} />

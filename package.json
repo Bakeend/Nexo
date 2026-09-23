@@ -54,7 +54,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",
-    "format": "prettier --write app src tests *.js *.json",
+    "format": "prettier --write AGENTS.md app src tests scripts *.js *.json",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "db:generate": "drizzle-kit generate",

@@ -35,7 +35,9 @@ export default function NotificationsSettings() {
         duration: reducedMotion ? motionDuration.fast : motionDuration.normal,
         useNativeDriver: Platform.OS !== 'web',
       }),
-      ...(reducedMotion ? [] : [Animated.spring(statusScale, { toValue: 1, ...motionSpring.selection, useNativeDriver: Platform.OS !== 'web' })]),
+      ...(reducedMotion
+        ? []
+        : [Animated.spring(statusScale, { toValue: 1, ...motionSpring.selection, useNativeDriver: Platform.OS !== 'web' })]),
     ]).start();
   }, [permissionResult, reducedMotion, statusOpacity, statusScale, statusVersion]);
 

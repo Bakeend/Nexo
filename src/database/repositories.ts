@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, like, or } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, or, sql, type SQLWrapper } from 'drizzle-orm';
 import { Platform } from 'react-native';
 import { db } from './database';
 import { attachments, inboxItems, itemTags, notes, reminders, settings, spaces, tags, tasks } from './schema';
@@ -9,6 +9,8 @@ import type {
   ItemType,
   Note,
   NoteBlock,
+  PinnedItem,
+  PinnedItemType,
   Reminder,
   RepeatRule,
   Space,
@@ -19,6 +21,8 @@ import type {
 } from '@/types/domain';
 import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 import { publishNoteBlockChange } from '@/services/note-block-events';
+import { matchesTaskDateFilter, type TaskListFilter } from '@/features/tasks/task-date-filter';
+import { createLikeSearchPattern, dedupeSearchMatches } from '@/features/search/search-helpers';
 
 const ruleFromDb = (value: string | null): RepeatRule => {
   if (!value) return null;
@@ -87,6 +91,69 @@ export async function updateNote(id: string, input: Partial<Pick<Note, 'title' |
   await db.update(notes).set(item).where(eq(notes.id, id)).run();
   return findNote(id);
 }
+
+export async function listPinnedItems(): Promise<PinnedItem[]> {
+  const [pinnedNotes, pinnedTasks, pinnedAttachments, pinnedSpaces] = await Promise.all([
+    db
+      .select()
+      .from(notes)
+      .where(and(eq(notes.pinned, true), isNull(notes.deletedAt), isNull(notes.archivedAt)))
+      .all(),
+    db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.pinned, true), isNull(tasks.deletedAt), isNull(tasks.archivedAt)))
+      .all(),
+    db
+      .select()
+      .from(attachments)
+      .where(and(eq(attachments.pinned, true), isNull(attachments.deletedAt)))
+      .all(),
+    db
+      .select()
+      .from(spaces)
+      .where(and(eq(spaces.pinned, true), isNull(spaces.deletedAt), isNull(spaces.archivedAt)))
+      .all(),
+  ]);
+
+  return [
+    ...pinnedNotes.map((note) => ({
+      id: note.id,
+      type: 'note' as const,
+      title: note.title || 'Nota sem título',
+      subtitle: 'Nota',
+      date: note.updatedAt,
+    })),
+    ...pinnedTasks.map((task) => ({
+      id: task.id,
+      type: 'task' as const,
+      title: task.title,
+      subtitle: task.completedAt ? 'Tarefa concluída' : 'Tarefa',
+      date: task.updatedAt,
+    })),
+    ...pinnedAttachments.map((attachment) => ({
+      id: attachment.id,
+      type: 'file' as const,
+      title: attachment.originalName || (attachment.type === 'audio' ? 'Áudio' : attachment.type === 'image' ? 'Imagem' : 'Arquivo'),
+      subtitle: attachment.type === 'audio' ? 'Áudio' : attachment.type === 'image' ? 'Imagem' : 'Arquivo',
+      date: attachment.createdAt,
+    })),
+    ...pinnedSpaces.map((space) => ({
+      id: space.id,
+      type: 'space' as const,
+      title: space.name,
+      subtitle: 'Espaço',
+      date: space.updatedAt,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function setPinnedItem(type: PinnedItemType, id: string, pinned: boolean) {
+  if (type === 'note') await db.update(notes).set({ pinned, updatedAt: nowIso() }).where(eq(notes.id, id)).run();
+  if (type === 'task') await db.update(tasks).set({ pinned, updatedAt: nowIso() }).where(eq(tasks.id, id)).run();
+  if (type === 'file') await db.update(attachments).set({ pinned }).where(eq(attachments.id, id)).run();
+  if (type === 'space') await db.update(spaces).set({ pinned, updatedAt: nowIso() }).where(eq(spaces.id, id)).run();
+}
 export async function appendNoteBlock(id: string, block: NoteBlock, notifyListeners = true) {
   const note = await findNote(id);
   if (!note) return undefined;
@@ -109,21 +176,15 @@ export async function restoreNote(id: string) {
   await db.update(notes).set({ deletedAt: null, archivedAt: null, updatedAt: nowIso() }).where(eq(notes.id, id)).run();
 }
 
-export async function listTasks(filter: 'today' | 'upcoming' | 'all' = 'all'): Promise<Task[]> {
+export async function listTasks(filter: TaskListFilter = 'all'): Promise<Task[]> {
   const rows = await db
     .select()
     .from(tasks)
     .where(and(isNull(tasks.deletedAt), isNull(tasks.archivedAt)))
     .orderBy(desc(tasks.dueAt), desc(tasks.createdAt))
     .all();
-  return (rows as Array<typeof tasks.$inferSelect>).map(toTask).filter((task) => {
-    if (filter === 'all') return true;
-    if (!task.dueAt) return filter === 'today';
-    const day = new Date(task.dueAt);
-    const now = new Date();
-    if (filter === 'today') return day.toDateString() === now.toDateString() || day < now;
-    return day > now;
-  });
+  const now = new Date();
+  return (rows as Array<typeof tasks.$inferSelect>).map(toTask).filter((task) => matchesTaskDateFilter(task.dueAt, filter, now));
 }
 const toTask = (row: typeof tasks.$inferSelect): Task =>
   ({ ...row, priority: row.priority as Priority, repeatRule: ruleFromDb(row.repeatRule) }) as Task;
@@ -153,6 +214,7 @@ export async function createTask(input: {
     parentSeriesId: null,
     spaceId: input.spaceId ?? null,
     relatedNoteId: input.relatedNoteId ?? null,
+    pinned: false,
     createdAt: now,
     updatedAt: now,
     archivedAt: null,
@@ -170,6 +232,7 @@ export async function updateTask(
     priority: Priority;
     spaceId: string | null;
     repeatRule: RepeatRule;
+    pinned: boolean;
   }>,
 ) {
   const data: Record<string, unknown> = { ...input, updatedAt: nowIso() };
@@ -275,7 +338,7 @@ export async function findSpace(id: string) {
 }
 export async function createSpace(name: string, icon = 'folder') {
   const now = nowIso();
-  const item = { id: newId(), name: name.trim(), icon, createdAt: now, updatedAt: now, archivedAt: null, deletedAt: null };
+  const item = { id: newId(), name: name.trim(), icon, pinned: false, createdAt: now, updatedAt: now, archivedAt: null, deletedAt: null };
   await db.insert(spaces).values(item).run();
   return item as Space;
 }
@@ -394,6 +457,7 @@ export async function createAttachment(input: {
     sizeBytes: input.sizeBytes ?? null,
     thumbnailPath: input.thumbnailPath ?? null,
     durationMs: input.durationMs ?? null,
+    pinned: false,
     createdAt: nowIso(),
     deletedAt: null,
   };
@@ -410,11 +474,15 @@ export async function listAttachments(itemId: string): Promise<Attachment[]> {
     .all()) as Attachment[];
 }
 
+export async function listStoredAttachments(): Promise<Attachment[]> {
+  return (await db.select().from(attachments).all()) as Attachment[];
+}
+
 export async function findAttachment(id: string): Promise<Attachment | undefined> {
   return (await db.select().from(attachments).where(eq(attachments.id, id)).all())[0] as Attachment | undefined;
 }
 
-export async function updateAttachment(id: string, input: { originalName?: string | null }) {
+export async function updateAttachment(id: string, input: { originalName?: string | null; pinned?: boolean }) {
   await db.update(attachments).set(input).where(eq(attachments.id, id)).run();
   return findAttachment(id);
 }
@@ -456,48 +524,63 @@ export async function deleteInbox(id: string) {
 }
 
 export async function searchAll(query: string): Promise<UnifiedItem[]> {
-  const q = `%${query.trim()}%`;
-  if (!query.trim()) return [];
-  const [noteRows, taskRows, reminderRows, inboxRows] = await Promise.all([
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) return [];
+  const pattern = createLikeSearchPattern(trimmedQuery);
+  const contains = (column: SQLWrapper) => sql`${column} LIKE ${pattern} ESCAPE '\\'`;
+  const [noteMatches, taskMatches, reminderMatches, inboxRows] = await Promise.all([
     db
-      .select()
+      .select({ item: notes, spaceName: spaces.name })
       .from(notes)
-      .where(and(isNull(notes.deletedAt), or(like(notes.title, q), like(notes.content, q))))
+      .leftJoin(spaces, and(eq(spaces.id, notes.spaceId), isNull(spaces.deletedAt)))
+      .leftJoin(itemTags, and(eq(itemTags.itemId, notes.id), eq(itemTags.itemType, 'note')))
+      .leftJoin(tags, eq(tags.id, itemTags.tagId))
+      .where(and(isNull(notes.deletedAt), or(contains(notes.title), contains(notes.content), contains(spaces.name), contains(tags.name))))
       .all(),
     db
-      .select()
+      .select({ item: tasks, spaceName: spaces.name })
       .from(tasks)
-      .where(and(isNull(tasks.deletedAt), like(tasks.title, q)))
+      .leftJoin(spaces, and(eq(spaces.id, tasks.spaceId), isNull(spaces.deletedAt)))
+      .leftJoin(itemTags, and(eq(itemTags.itemId, tasks.id), eq(itemTags.itemType, 'task')))
+      .leftJoin(tags, eq(tags.id, itemTags.tagId))
+      .where(
+        and(isNull(tasks.deletedAt), or(contains(tasks.title), contains(tasks.description), contains(spaces.name), contains(tags.name))),
+      )
       .all(),
     db
-      .select()
+      .select({ item: reminders })
       .from(reminders)
-      .where(and(isNull(reminders.deletedAt), like(reminders.title, q)))
+      .leftJoin(itemTags, and(eq(itemTags.itemId, reminders.id), eq(itemTags.itemType, 'reminder')))
+      .leftJoin(tags, eq(tags.id, itemTags.tagId))
+      .where(and(isNull(reminders.deletedAt), or(contains(reminders.title), contains(reminders.description), contains(tags.name))))
       .all(),
     db
       .select()
       .from(inboxItems)
-      .where(and(isNull(inboxItems.deletedAt), like(inboxItems.rawText, q)))
+      .where(and(isNull(inboxItems.deletedAt), contains(inboxItems.rawText)))
       .all(),
   ]);
-  return [
-    ...noteRows.map((n) => ({
+  const noteRows = noteMatches.map(({ item, spaceName }) => ({ ...item, spaceName }));
+  const taskRows = taskMatches.map(({ item, spaceName }) => ({ ...item, spaceName }));
+  const reminderRows = reminderMatches.map(({ item }) => item);
+  const results = [
+    ...noteRows.map(({ spaceName, ...n }) => ({
       id: n.id,
       type: 'note' as const,
       title: n.title || 'Nota sem título',
       subtitle: 'Nota',
       date: n.updatedAt,
-      spaceName: null,
+      spaceName,
       pinned: n.pinned,
       source: n as unknown as Note,
     })),
-    ...taskRows.map((t) => ({
+    ...taskRows.map(({ spaceName, ...t }) => ({
       id: t.id,
       type: 'task' as const,
       title: t.title,
       subtitle: 'Tarefa',
       date: t.dueAt,
-      spaceName: null,
+      spaceName,
       pinned: false,
       source: toTask(t),
     })),
@@ -522,6 +605,7 @@ export async function searchAll(query: string): Promise<UnifiedItem[]> {
       source: i as unknown as InboxItem,
     })),
   ];
+  return dedupeSearchMatches(results);
 }
 
 const defaultSpaces = [

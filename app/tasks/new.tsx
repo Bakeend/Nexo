@@ -20,7 +20,7 @@ const priorityLabels: Record<Priority, string> = {
 export default function NewTask() {
   const styles = useThemeStyles(makeStyles);
   const { showSnackbar } = useSnackbar();
-  const params = useLocalSearchParams<{ id?: string; seed?: string; relatedNoteId?: string }>();
+  const params = useLocalSearchParams<{ id?: string; seed?: string; relatedNoteId?: string; spaceId?: string }>();
   const [title, setTitle] = useState(params.seed || '');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('none');
@@ -42,10 +42,18 @@ export default function NewTask() {
     if (!title.trim()) return;
     const task = existingId
       ? await updateTask(existingId, { title, description, priority, dueAt: date?.toISOString() || null })
-      : await createTask({ title, description, priority, dueAt: date?.toISOString() || null, relatedNoteId: params.relatedNoteId || null });
+      : await createTask({
+          title,
+          description,
+          priority,
+          dueAt: date?.toISOString() || null,
+          spaceId: params.spaceId || null,
+          relatedNoteId: params.relatedNoteId || null,
+        });
     if (!task) return;
     showSnackbar(existingId ? 'Tarefa atualizada' : 'Tarefa criada', existingId ? 'info' : 'success');
-    router.replace({ pathname: '/tasks/[id]', params: { id: task.id } });
+    if (existingId) router.replace({ pathname: '/tasks/[id]', params: { id: task.id } });
+    else goBackOrHome();
   };
   return (
     <SafeAreaView edges={['top']} style={styles.safeRoot}>

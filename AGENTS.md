@@ -2,17 +2,17 @@
 
 ## 1. Purpose
 
-This project follows a **delegation-first development workflow**.
+This project follows an **authorization-first delegation workflow**.
 
 The main agent acts as the coordinator, reviewer, security reviewer, integration owner, and final authority.
 
-Sub-agents are responsible for implementation, investigation, testing, research, and other delegated technical work.
+Sub-agents may be used only for scoped implementation work, and only when the user explicitly requests sub-agents, delegation, or parallel agent work for the current task.
 
 The main agent must never assume that a sub-agent's work is correct without reviewing the actual changes.
 
 Core principle:
 
-**Sub-agents implement. The main agent coordinates, reviews, validates, detects bugs, checks security, integrates changes, and approves the final result.**
+**The main agent works directly unless the user explicitly authorizes sub-agents. When authorized, sub-agents implement within clearly separated scopes, while the main agent coordinates, reviews, validates, checks security, integrates changes, and approves the final result.**
 
 ---
 
@@ -22,20 +22,20 @@ Core principle:
 
 The main agent is responsible for:
 
-* Understanding the user's request.
-* Inspecting the relevant project structure.
-* Identifying affected systems and files.
-* Breaking complex tasks into smaller tasks.
-* Delegating work to appropriate sub-agents.
-* Defining clear scope for each sub-agent.
-* Preventing unnecessary overlapping work.
-* Reviewing the actual code changes.
-* Reviewing security-sensitive changes.
-* Detecting bugs and regressions.
-* Coordinating corrections.
-* Resolving conflicts between sub-agents.
-* Performing final integration checks.
-* Deciding when the complete task is finished.
+- Understanding the user's request.
+- Inspecting the relevant project structure.
+- Identifying affected systems and files.
+- Breaking complex tasks into smaller tasks.
+- Delegating work to appropriate sub-agents only when explicitly requested by the user.
+- Defining clear scope for each sub-agent.
+- Preventing unnecessary overlapping work.
+- Reviewing the actual code changes.
+- Reviewing security-sensitive changes.
+- Detecting bugs and regressions.
+- Performing corrections directly.
+- Resolving conflicts between sub-agents.
+- Performing final integration checks.
+- Deciding when the complete task is finished.
 
 The main agent is the final authority over the task.
 
@@ -43,54 +43,62 @@ The main agent is the final authority over the task.
 
 ## Sub-Agents
 
-Sub-agents are responsible for specific delegated work.
+Sub-agents are responsible only for specific implementation work delegated by the main agent.
 
 Typical responsibilities include:
 
-* Feature implementation
-* Bug fixes
-* Refactoring
-* Frontend development
-* Backend development
-* API implementation
-* Database changes
-* Test creation
-* Test execution
-* Code investigation
-* Dependency research
-* Performance improvements
-* Documentation updates
-* Technical research
+- Feature implementation
+- Bug fixes
+- Refactoring
+- Frontend development
+- Backend development
+- API implementation
+- Database changes
+- Tests that are part of the assigned implementation
+- Documentation changes required by the assigned implementation
+
+Sub-agents must not be assigned investigation, research, planning, code review, security review, integration, error diagnosis, correction, or general validation tasks. Those responsibilities belong to the main agent.
 
 Sub-agents must remain within their assigned scope.
 
-A sub-agent must never assume ownership of the entire task unless explicitly assigned as such by the main agent.
+A sub-agent must never be assigned or assume ownership of the entire task.
 
 ---
 
-# 3. Delegation-First Rule
+# 3. Sub-Agent Authorization Rule
 
-Coding and implementation work should normally be delegated to sub-agents.
+The main agent must not create, invoke, or delegate work to sub-agents unless the user explicitly asks for sub-agents, delegation, or parallel agent work in the current request.
 
-The main agent should focus primarily on:
+Permission to use sub-agents is task-specific. It must not be inferred from:
 
-* Planning
-* Coordination
-* Delegation
-* Review
-* Security
-* Bug detection
-* Integration
-* Final validation
+- The size or complexity of the task.
+- A previous request that used sub-agents.
+- The availability of parallel work.
+- A belief that delegation would be faster or produce a better result.
+- General instructions describing how sub-agents should operate when authorized.
 
-The main agent may implement changes directly when:
+If the user has not explicitly authorized sub-agents, the main agent must perform the work directly. The main agent should not ask for permission to delegate unless the task cannot reasonably proceed without it.
 
-* The change is trivial.
-* Delegation would create unnecessary overhead.
-* A small correction is required during final review.
-* A sub-agent produced a minor mistake that can be corrected immediately.
+Explicit authorization permits only the minimum delegation needed for implementation. It is not permission to create a large number of assignments. The main agent must:
 
-For non-trivial coding tasks, delegation should be preferred.
+- Use the fewest sub-agents reasonably necessary.
+- Prefer one cohesive implementation assignment over many small tasks.
+- Avoid creating a separate sub-agent for each file, test, error, or minor concern.
+- Keep investigation, planning, review, integration, debugging, and corrections under the main agent's ownership.
+- Never send completed sub-agent work back for a correction round; the main agent must make the correction directly.
+
+When the user explicitly authorizes sub-agents, the main agent should focus primarily on:
+
+- Planning
+- Coordination
+- Delegation
+- Review
+- Security
+- Bug detection
+- Integration
+- Final validation
+
+Even when sub-agents are authorized, the main agent should implement directly when delegation would add unnecessary overhead. All corrections discovered after a sub-agent returns its implementation must be made directly by the main agent.
 
 ---
 
@@ -100,21 +108,21 @@ Before delegating implementation, the main agent must understand what needs to b
 
 The main agent should determine:
 
-* The requested behavior.
-* The expected result.
-* The affected area of the project.
-* Relevant files or directories.
-* Existing architecture that must be respected.
-* Potential security implications.
-* Potential regression risks.
-* Dependencies between tasks.
+- The requested behavior.
+- The expected result.
+- The affected area of the project.
+- Relevant files or directories.
+- Existing architecture that must be respected.
+- Potential security implications.
+- Potential regression risks.
+- Dependencies between tasks.
 
 The main agent must not delegate vague instructions such as:
 
-* "Fix this."
-* "Improve this."
-* "Make it work."
-* "Clean this code."
+- "Fix this."
+- "Improve this."
+- "Make it work."
+- "Clean this code."
 
 The main agent must first convert the request into a concrete technical task.
 
@@ -234,7 +242,7 @@ Relevant files:
 - src/components/LoginForm.tsx
 ```
 
-If the exact file is unknown, the sub-agent may investigate the project to find the correct implementation.
+If the exact file is unknown, the main agent must investigate the project and identify the implementation scope before delegating.
 
 The sub-agent must avoid modifying unrelated files.
 
@@ -246,13 +254,35 @@ When multiple sub-agents work in parallel, the main agent should assign clear ow
 
 Prefer:
 
-* One agent per file.
-* One agent per subsystem.
-* One agent per isolated task.
+- One agent per cohesive subsystem or implementation area.
+- One agent for an isolated feature that may span multiple related files.
+- The smallest number of agents that still provides a clear ownership boundary.
 
 Avoid assigning multiple sub-agents to modify the same file simultaneously.
 
 If overlap is unavoidable, the main agent must coordinate the work and resolve conflicts.
+
+Before assigning work, the main agent must create a task map that identifies:
+
+- Each subtask's objective and expected deliverable.
+- The files or subsystem owned by each sub-agent.
+- Dependencies between subtasks.
+- Shared interfaces or contracts that must remain stable.
+- The order in which dependent work must be completed.
+- The validation responsibility for each subtask.
+
+Subtasks should be divided by cohesive responsibility, not by arbitrary file count. Each assignment should be independently understandable, testable, and small enough to review.
+
+The main agent should prefer these boundaries, in order:
+
+1. Separate subsystems with stable interfaces.
+2. Separate features or user-visible behaviors.
+3. Separate implementation modules that do not share files.
+4. Sequential implementation under one owner when boundaries are unclear.
+
+Do not split work when the subtasks require continuous coordination, repeatedly edit the same files, or depend on an interface that has not yet been defined. In those cases, assign one owner or execute the work sequentially.
+
+Every assignment must state what the sub-agent may modify and what it must not modify. Do not create read-only investigation, research, or review assignments for sub-agents.
 
 ---
 
@@ -260,11 +290,11 @@ If overlap is unavoidable, the main agent must coordinate the work and resolve c
 
 Before modifying code, a sub-agent should inspect:
 
-* The target file.
-* Directly related files.
-* Existing utilities.
-* Existing tests.
-* Existing architecture patterns.
+- The target file.
+- Directly related files.
+- Existing utilities.
+- Existing tests.
+- Existing architecture patterns.
 
 The agent should understand the local implementation before changing it.
 
@@ -276,15 +306,11 @@ Do not modify code based only on assumptions.
 
 For complex bugs or unclear behavior, investigation should happen before implementation.
 
-The main agent may assign an investigation-only task.
+The main agent must perform the investigation directly. Investigation-only tasks must not be delegated to sub-agents.
 
-Example:
+Main-agent investigation checklist:
 
 ```text
-Do not modify any files.
-
-Investigate the reported bug and return:
-
 - Root cause
 - Affected files
 - Relevant code path
@@ -293,17 +319,17 @@ Investigate the reported bug and return:
 - Security implications if applicable
 ```
 
-After the investigation, implementation may be delegated separately.
+After the main agent identifies the root cause, affected files, required behavior, and regression risks, implementation may be delegated only if the user explicitly authorized sub-agents.
 
 This separation is recommended for:
 
-* Complex bugs
-* Unknown architecture
-* Race conditions
-* Performance issues
-* Security issues
-* Difficult regressions
-* Unclear user reports
+- Complex bugs
+- Unknown architecture
+- Race conditions
+- Performance issues
+- Security issues
+- Difficult regressions
+- Unclear user reports
 
 ---
 
@@ -313,15 +339,15 @@ Sub-agents must stay within the assigned scope.
 
 They must not:
 
-* Rewrite unrelated code.
-* Rename unrelated files.
-* Reorganize folders without need.
-* Change architecture unnecessarily.
-* Reformat large unrelated areas.
-* Remove existing functionality without instruction.
-* Add unrelated features.
-* Perform speculative improvements.
-* Replace working systems without justification.
+- Rewrite unrelated code.
+- Rename unrelated files.
+- Reorganize folders without need.
+- Change architecture unnecessarily.
+- Reformat large unrelated areas.
+- Remove existing functionality without instruction.
+- Add unrelated features.
+- Perform speculative improvements.
+- Replace working systems without justification.
 
 Prefer the smallest correct change that satisfies the requirements.
 
@@ -333,13 +359,13 @@ Existing behavior should remain unchanged unless the task explicitly requires a 
 
 Sub-agents must avoid breaking:
 
-* Existing APIs
-* Existing UI behavior
-* Existing database data
-* Existing configuration
-* Existing integrations
-* Existing user flows
-* Existing public interfaces
+- Existing APIs
+- Existing UI behavior
+- Existing database data
+- Existing configuration
+- Existing integrations
+- Existing user flows
+- Existing public interfaces
 
 Backward compatibility should be preserved when applicable.
 
@@ -351,14 +377,14 @@ Sub-agents should follow the project's current architecture.
 
 They should reuse:
 
-* Existing utilities
-* Existing abstractions
-* Existing design patterns
-* Existing state management
-* Existing error handling
-* Existing naming conventions
-* Existing folder structure
-* Existing API conventions
+- Existing utilities
+- Existing abstractions
+- Existing design patterns
+- Existing state management
+- Existing error handling
+- Existing naming conventions
+- Existing folder structure
+- Existing API conventions
 
 Do not duplicate logic that already exists.
 
@@ -372,11 +398,11 @@ Prefer focused modifications over broad rewrites.
 
 Avoid:
 
-* Rewriting entire files for small fixes.
-* Replacing working modules unnecessarily.
-* Creating abstractions for trivial logic.
-* Refactoring unrelated code while implementing a feature.
-* Introducing unnecessary layers.
+- Rewriting entire files for small fixes.
+- Replacing working modules unnecessarily.
+- Creating abstractions for trivial logic.
+- Refactoring unrelated code while implementing a feature.
+- Introducing unnecessary layers.
 
 The implementation should be as small as reasonably possible while remaining correct and maintainable.
 
@@ -390,11 +416,11 @@ Before rewriting a file, determine whether the requested change can be implement
 
 Large file replacements increase the risk of:
 
-* Removing existing behavior.
-* Deleting comments.
-* Losing configuration.
-* Creating regressions.
-* Causing merge conflicts.
+- Removing existing behavior.
+- Deleting comments.
+- Losing configuration.
+- Creating regressions.
+- Causing merge conflicts.
 
 ---
 
@@ -406,12 +432,12 @@ A new dependency should only be added when it provides clear value.
 
 Before adding one, verify:
 
-* The project actually needs it.
-* It is maintained.
-* It is compatible with the existing environment.
-* It does not introduce unnecessary security risks.
-* It does not significantly increase complexity.
-* Existing tools cannot reasonably provide the same functionality.
+- The project actually needs it.
+- It is maintained.
+- It is compatible with the existing environment.
+- It does not introduce unnecessary security risks.
+- It does not significantly increase complexity.
+- Existing tools cannot reasonably provide the same functionality.
 
 Do not add dependencies for trivial functionality.
 
@@ -421,14 +447,14 @@ Do not add dependencies for trivial functionality.
 
 The sub-agent assigned to implementation is responsible for:
 
-* Understanding the local code.
-* Implementing the requested behavior.
-* Respecting the defined scope.
-* Avoiding unrelated changes.
-* Handling relevant edge cases.
-* Updating tests when appropriate.
-* Running relevant validation.
-* Reporting the results accurately.
+- Understanding the local code.
+- Implementing the requested behavior.
+- Respecting the defined scope.
+- Avoiding unrelated changes.
+- Handling relevant edge cases.
+- Updating tests when appropriate.
+- Running relevant validation.
+- Reporting the results accurately.
 
 ---
 
@@ -438,13 +464,13 @@ The sub-agent that implements a change should test its own implementation before
 
 When applicable, run:
 
-* Unit tests
-* Integration tests
-* End-to-end tests
-* Type checking
-* Linting
-* Build validation
-* Relevant manual verification
+- Unit tests
+- Integration tests
+- End-to-end tests
+- Type checking
+- Linting
+- Build validation
+- Relevant manual verification
 
 If a validation command already exists in the project, prefer using it.
 
@@ -483,14 +509,14 @@ Failures must not be hidden.
 
 Sub-agents must report:
 
-* Failed tests.
-* Build failures.
-* Type errors.
-* Lint failures.
-* Missing dependencies.
-* Environment limitations.
-* Unresolved bugs.
-* Uncertain behavior.
+- Failed tests.
+- Build failures.
+- Type errors.
+- Lint failures.
+- Missing dependencies.
+- Environment limitations.
+- Unresolved bugs.
+- Uncertain behavior.
 
 A partial success must be reported as partial success.
 
@@ -545,7 +571,7 @@ The agent that implemented the code should not be considered the final reviewer.
 
 The main agent must independently inspect the result.
 
-For high-risk or large changes, an additional review sub-agent may also be used.
+Review must not be delegated to another sub-agent. For high-risk or large changes, the main agent must increase the depth of its own review.
 
 ---
 
@@ -577,17 +603,17 @@ The main agent should inspect the actual code changes whenever possible.
 
 Do not rely only on:
 
-* Sub-agent summaries
-* Claims of successful tests
-* Descriptions of modifications
+- Sub-agent summaries
+- Claims of successful tests
+- Descriptions of modifications
 
 The review should inspect:
 
-* Modified files
-* Relevant code sections
-* Git diff when available
-* Tests
-* Related modules
+- Modified files
+- Relevant code sections
+- Git diff when available
+- Tests
+- Related modules
 
 A summary is useful, but it is not a substitute for code review.
 
@@ -599,15 +625,15 @@ When version-control information is available, the main agent should review the 
 
 The review should look for:
 
-* Unexpected files.
-* Unrelated changes.
-* Removed behavior.
-* Large accidental rewrites.
-* Debug code.
-* Temporary code.
-* Hardcoded values.
-* Security-sensitive modifications.
-* Missing tests.
+- Unexpected files.
+- Unrelated changes.
+- Removed behavior.
+- Large accidental rewrites.
+- Debug code.
+- Temporary code.
+- Hardcoded values.
+- Security-sensitive modifications.
+- Missing tests.
 
 The main agent should verify that the diff matches the assigned scope.
 
@@ -617,17 +643,17 @@ The main agent should verify that the diff matches the assigned scope.
 
 The main agent must review changes for:
 
-* Correctness
-* Logic errors
-* Missing edge cases
-* Incorrect assumptions
-* Broken imports
-* Type problems
-* Unexpected side effects
-* Duplicate logic
-* Excessive complexity
-* Architecture violations
-* User requirement mismatches
+- Correctness
+- Logic errors
+- Missing edge cases
+- Incorrect assumptions
+- Broken imports
+- Type problems
+- Unexpected side effects
+- Duplicate logic
+- Excessive complexity
+- Architecture violations
+- User requirement mismatches
 
 The main agent should challenge assumptions made during implementation.
 
@@ -639,22 +665,22 @@ The main agent is specifically responsible for identifying bugs introduced by su
 
 Review for:
 
-* Null values
-* Undefined values
-* Invalid input
-* Empty states
-* Incorrect conditions
-* Off-by-one errors
-* Async failures
-* Race conditions
-* Incorrect state updates
-* Stale state
-* Error handling problems
-* API failure handling
-* Database failures
-* Invalid transformations
-* Boundary conditions
-* Unexpected user behavior
+- Null values
+- Undefined values
+- Invalid input
+- Empty states
+- Incorrect conditions
+- Off-by-one errors
+- Async failures
+- Race conditions
+- Incorrect state updates
+- Stale state
+- Error handling problems
+- API failure handling
+- Database failures
+- Invalid transformations
+- Boundary conditions
+- Unexpected user behavior
 
 ---
 
@@ -664,41 +690,41 @@ Security-sensitive changes require additional review by the main agent.
 
 Important areas include:
 
-* Authentication
-* Authorization
-* Permissions
-* User input
-* API endpoints
-* Database access
-* File handling
-* File uploads
-* Tokens
-* Sessions
-* Cookies
-* Secrets
-* Environment variables
-* External requests
-* Webhooks
-* Payment logic
-* Admin functionality
+- Authentication
+- Authorization
+- Permissions
+- User input
+- API endpoints
+- Database access
+- File handling
+- File uploads
+- Tokens
+- Sessions
+- Cookies
+- Secrets
+- Environment variables
+- External requests
+- Webhooks
+- Payment logic
+- Admin functionality
 
 Review for issues such as:
 
-* Injection
-* SQL injection
-* Command injection
-* Cross-site scripting
-* Missing authorization
-* Insecure direct object references
-* Path traversal
-* Unsafe file access
-* Secret exposure
-* Sensitive information in logs
-* Weak token handling
-* Unsafe redirects
-* Excessive permissions
-* Unsafe deserialization
-* Missing input validation
+- Injection
+- SQL injection
+- Command injection
+- Cross-site scripting
+- Missing authorization
+- Insecure direct object references
+- Path traversal
+- Unsafe file access
+- Secret exposure
+- Sensitive information in logs
+- Weak token handling
+- Unsafe redirects
+- Excessive permissions
+- Unsafe deserialization
+- Missing input validation
 
 Security review effort should be proportional to the risk of the change.
 
@@ -708,22 +734,22 @@ Security review effort should be proportional to the risk of the change.
 
 Changes involving the following should automatically receive additional security review:
 
-* Authentication
-* Authorization
-* Roles
-* Permissions
-* Passwords
-* Tokens
-* Sessions
-* Cookies
-* Database permissions
-* File uploads
-* Payment processing
-* Webhooks
-* Admin panels
-* Secrets
-* Encryption
-* External integrations
+- Authentication
+- Authorization
+- Roles
+- Permissions
+- Passwords
+- Tokens
+- Sessions
+- Cookies
+- Database permissions
+- File uploads
+- Payment processing
+- Webhooks
+- Admin panels
+- Secrets
+- Encryption
+- External integrations
 
 The main agent should not approve these changes solely based on the implementation sub-agent's report.
 
@@ -735,58 +761,66 @@ The main agent should verify that new changes do not break existing functionalit
 
 Check:
 
-* Existing interfaces.
-* Existing API contracts.
-* Existing tests.
-* Existing database behavior.
-* Existing UI flows.
-* Existing integrations.
-* Existing configuration.
+- Existing interfaces.
+- Existing API contracts.
+- Existing tests.
+- Existing database behavior.
+- Existing UI flows.
+- Existing integrations.
+- Existing configuration.
 
-When practical, run or delegate regression tests.
+When practical, the main agent must run the relevant regression tests directly.
 
 ---
 
-# 31. Independent Review
+# 31. Main Agent Review
 
-For large, complex, or high-risk tasks, the main agent may delegate an independent review to another sub-agent.
+For large, complex, or high-risk tasks, the main agent must perform a deeper review directly. Review tasks must not be delegated to sub-agents.
 
-The reviewer should not simply repeat the implementation.
+The main agent should not simply repeat the implementation reasoning.
 
-The reviewer should search for:
+The main agent should search for:
 
-* Bugs
-* Security issues
-* Missed requirements
-* Regressions
-* Overengineering
-* Missing edge cases
-* Incorrect assumptions
+- Bugs
+- Security issues
+- Missed requirements
+- Regressions
+- Overengineering
+- Missing edge cases
+- Incorrect assumptions
 
-Independent review is especially useful for:
+Deeper main-agent review is especially important for:
 
-* Authentication
-* Payment systems
-* Database migrations
-* Large refactors
-* Complex concurrency
-* Production-critical code
+- Authentication
+- Payment systems
+- Database migrations
+- Large refactors
+- Complex concurrency
+- Production-critical code
 
 ---
 
 # 32. Parallel Sub-Agents
 
-Independent tasks may be delegated in parallel.
+When the user has explicitly authorized sub-agents, independent tasks may be delegated in parallel.
 
 Good examples:
 
-* Frontend implementation
-* Backend implementation
-* Test creation
-* Documentation research
-* Independent code review
+- Frontend implementation
+- Backend implementation
+- Separate service implementations with an already defined contract
+- Independent feature modules that do not share files
 
-Parallel work should only be used when responsibilities can be clearly separated.
+Parallel work should only be used when responsibilities can be clearly separated and no subtask needs unfinished output from another.
+
+Before starting parallel work, the main agent must verify that:
+
+- Each sub-agent has exclusive write ownership of its files or subsystem.
+- Shared contracts are already defined and communicated.
+- Each subtask has its own acceptance criteria and validation steps.
+- Combining the results will not require competing edits to the same code.
+
+Tasks with ordering dependencies must be executed sequentially. A dependent task should begin only after the main agent has reviewed the prerequisite output or established the contract it relies on.
 
 ---
 
@@ -796,9 +830,9 @@ The main agent should not assign the same implementation task to multiple sub-ag
 
 Valid reasons include:
 
-* Independent review
-* Comparing architectural approaches
-* Investigating separate hypotheses
+- Independent review
+- Comparing architectural approaches
+- Investigating separate hypotheses
 
 Do not waste resources by having several agents unknowingly implement the same change.
 
@@ -810,9 +844,9 @@ Before launching parallel work, the main agent should determine whether tasks sh
 
 If they do, prefer:
 
-* Sequential execution.
-* Clear file ownership.
-* Clear subsystem ownership.
+- Sequential execution.
+- Clear file ownership.
+- Clear subsystem ownership.
 
 If conflicts happen, the main agent is responsible for resolving them.
 
@@ -822,9 +856,9 @@ If conflicts happen, the main agent is responsible for resolving them.
 
 If multiple tasks affect the same file:
 
-* Prefer assigning one agent as the file owner.
-* Other agents should provide recommendations instead of editing the same file.
-* The main agent may consolidate the changes afterward.
+- Prefer assigning one agent as the file owner.
+- Other agents should provide recommendations instead of editing the same file.
+- The main agent may consolidate the changes afterward.
 
 This reduces merge conflicts and inconsistent implementations.
 
@@ -844,16 +878,16 @@ Individual components working separately does not guarantee that the integrated 
 
 After combining work from multiple sub-agents, validate:
 
-* Imports
-* Interfaces
-* API contracts
-* Shared types
-* Database contracts
-* State synchronization
-* Data flow
-* Configuration
-* Build compatibility
-* Runtime assumptions
+- Imports
+- Interfaces
+- API contracts
+- Shared types
+- Database contracts
+- State synchronization
+- Data flow
+- Configuration
+- Build compatibility
+- Runtime assumptions
 
 The integrated application should be validated as a whole when practical.
 
@@ -887,9 +921,9 @@ If completing the task requires modifying additional systems, the sub-agent shou
 
 The main agent may then:
 
-* Expand the scope.
-* Assign another sub-agent.
-* Handle the additional change separately.
+- Expand the scope.
+- Assign another sub-agent.
+- Handle the additional change separately.
 
 ---
 
@@ -897,22 +931,22 @@ The main agent may then:
 
 When using:
 
-* Libraries
-* Framework APIs
-* SDKs
-* Third-party services
-* External APIs
-* Build tools
+- Libraries
+- Framework APIs
+- SDKs
+- Third-party services
+- External APIs
+- Build tools
 
 The agent should verify how the API is actually used.
 
 Do not invent:
 
-* Functions
-* Configuration options
-* Environment variables
-* CLI arguments
-* API responses
+- Functions
+- Configuration options
+- Environment variables
+- CLI arguments
+- API responses
 
 Use existing project usage or authoritative documentation when available.
 
@@ -922,13 +956,13 @@ Use existing project usage or authoritative documentation when available.
 
 Documentation should be updated when a change affects:
 
-* Installation
-* Configuration
-* Environment variables
-* Public APIs
-* Developer workflows
-* Deployment
-* User-facing behavior that requires explanation
+- Installation
+- Configuration
+- Environment variables
+- Public APIs
+- Developer workflows
+- Deployment
+- User-facing behavior that requires explanation
 
 Do not generate unnecessary documentation for trivial internal changes.
 
@@ -966,9 +1000,9 @@ Large migrations should be planned carefully.
 
 When possible:
 
-* Separate structural changes from behavior changes.
-* Avoid destructive changes unless required.
-* Preserve backward compatibility during migrations.
+- Separate structural changes from behavior changes.
+- Avoid destructive changes unless required.
+- Preserve backward compatibility during migrations.
 
 ---
 
@@ -978,14 +1012,14 @@ Database modifications require special care.
 
 Review:
 
-* Schema compatibility
-* Existing data
-* Migration safety
-* Constraints
-* Indexes
-* Nullability
-* Default values
-* Rollback implications
+- Schema compatibility
+- Existing data
+- Migration safety
+- Constraints
+- Indexes
+- Nullability
+- Default values
+- Rollback implications
 
 Avoid destructive database changes unless explicitly required.
 
@@ -995,13 +1029,13 @@ Avoid destructive database changes unless explicitly required.
 
 When changing an API, verify:
 
-* Existing consumers.
-* Request format.
-* Response format.
-* Error behavior.
-* Authentication requirements.
-* Authorization requirements.
-* Backward compatibility.
+- Existing consumers.
+- Request format.
+- Response format.
+- Error behavior.
+- Authentication requirements.
+- Authorization requirements.
+- Backward compatibility.
 
 Do not silently change a public API contract unless required.
 
@@ -1027,10 +1061,10 @@ Errors should be handled appropriately for the architecture.
 
 Avoid:
 
-* Empty catch blocks.
-* Ignoring rejected promises.
-* Returning misleading success states.
-* Exposing sensitive internal errors to users.
+- Empty catch blocks.
+- Ignoring rejected promises.
+- Returning misleading success states.
+- Exposing sensitive internal errors to users.
 
 ---
 
@@ -1040,12 +1074,12 @@ Do not log sensitive information.
 
 Avoid logging:
 
-* Passwords
-* Tokens
-* API keys
-* Session secrets
-* Private user data
-* Authentication headers
+- Passwords
+- Tokens
+- API keys
+- Session secrets
+- Private user data
+- Authentication headers
 
 Debug logging introduced during development should be removed when no longer necessary.
 
@@ -1059,12 +1093,12 @@ Use the project's established configuration or environment system.
 
 Examples of secrets include:
 
-* API keys
-* Access tokens
-* Passwords
-* Private keys
-* Webhook secrets
-* Database credentials
+- API keys
+- Access tokens
+- Passwords
+- Private keys
+- Webhook secrets
+- Database credentials
 
 ---
 
@@ -1076,10 +1110,10 @@ Do not sacrifice readability and correctness for speculative optimization.
 
 When optimizing:
 
-* Identify the bottleneck.
-* Measure when possible.
-* Preserve behavior.
-* Validate the result.
+- Identify the bottleneck.
+- Measure when possible.
+- Preserve behavior.
+- Validate the result.
 
 ---
 
@@ -1141,10 +1175,10 @@ If the failure existed before the task and is unrelated, document that clearly.
 
 Agents must not:
 
-* Delete failing tests without reason.
-* Comment out tests.
-* Disable assertions.
-* Skip tests simply to obtain a green result.
+- Delete failing tests without reason.
+- Comment out tests.
+- Disable assertions.
+- Skip tests simply to obtain a green result.
 
 If a test is incorrect, explain why it needs to be changed.
 
@@ -1154,11 +1188,11 @@ If a test is incorrect, explain why it needs to be changed.
 
 Do not mark a task complete using:
 
-* TODO-only implementations
-* Fake data
-* Hardcoded temporary responses
-* Placeholder components
-* Mock behavior in production code
+- TODO-only implementations
+- Fake data
+- Hardcoded temporary responses
+- Placeholder components
+- Mock behavior in production code
 
 unless explicitly requested.
 
@@ -1166,22 +1200,18 @@ unless explicitly requested.
 
 # 56. Main Agent Correction Loop
 
-If the main agent finds a problem during review, it should initiate a correction loop.
+If the main agent finds a problem during review, it must diagnose and correct the problem directly.
 
 The correction instructions should clearly explain:
 
-* What is wrong.
-* Where the issue is.
-* What behavior is expected.
-* What must remain unchanged.
+- What is wrong.
+- Where the issue is.
+- What behavior is expected.
+- What must remain unchanged.
 
-The correction may be delegated back to:
+Corrections must not be delegated back to the original sub-agent or assigned to another sub-agent. The main agent owns all debugging, corrective edits, and validation after the initial delegated implementation is returned.
 
-* The original sub-agent.
-* A different sub-agent.
-* A specialized reviewer.
-
-The main agent must review the corrected result again.
+The main agent must review its correction again.
 
 ---
 
@@ -1193,10 +1223,10 @@ Do not assume that fixing one issue did not introduce another.
 
 After corrections, verify:
 
-* The original issue is resolved.
-* No new regressions were introduced.
-* Tests still pass.
-* Security remains intact.
+- The original issue is resolved.
+- No new regressions were introduced.
+- Tests still pass.
+- Security remains intact.
 
 ---
 
@@ -1204,15 +1234,15 @@ After corrections, verify:
 
 Before declaring the task complete, the main agent should verify:
 
-* The user's original request was satisfied.
-* Relevant files were correctly modified.
-* Sub-agent work was reviewed.
-* Known bugs were addressed.
-* Relevant security risks were reviewed.
-* Relevant tests were executed.
-* Integration works.
-* No unrelated changes were introduced.
-* No critical unresolved issue remains.
+- The user's original request was satisfied.
+- Relevant files were correctly modified.
+- Sub-agent work was reviewed.
+- Known bugs were addressed.
+- Relevant security risks were reviewed.
+- Relevant tests were executed.
+- Integration works.
+- No unrelated changes were introduced.
+- No critical unresolved issue remains.
 
 ---
 
@@ -1249,23 +1279,22 @@ Performance or convenience must not override correctness or security.
 
 For a normal implementation task, use the following process:
 
-* Understand the user's request.
-* Inspect the relevant project area.
-* Identify affected files and systems.
-* Define implementation tasks.
-* Assign file or subsystem ownership.
-* Delegate implementation to sub-agents.
-* Let sub-agents implement and validate their work.
-* Collect implementation reports.
-* Review the actual changes.
-* Review the diff when available.
-* Check for bugs and regressions.
-* Perform security review when relevant.
-* Request corrections when needed.
-* Re-review corrected changes.
-* Validate integration.
-* Perform final validation.
-* Only then declare the task complete.
+- Understand the user's request.
+- Inspect the relevant project area.
+- Identify affected files and systems.
+- Define implementation tasks.
+- Determine whether the user explicitly authorized sub-agents.
+- If authorized, map dependencies, assign non-overlapping file or subsystem ownership, delegate scoped work, and collect implementation reports.
+- If not authorized, implement and validate the work directly.
+- Review the actual changes.
+- Review the diff when available.
+- Check for bugs and regressions.
+- Perform security review when relevant.
+- Make any required corrections directly; do not delegate correction rounds.
+- Re-review corrected changes.
+- Validate integration.
+- Perform final validation.
+- Only then declare the task complete.
 
 ---
 
@@ -1273,16 +1302,16 @@ For a normal implementation task, use the following process:
 
 For complex bugs:
 
-* Reproduce or understand the reported problem.
-* Delegate investigation if necessary.
-* Identify the root cause.
-* Identify affected files.
-* Determine the smallest safe fix.
-* Delegate implementation.
-* Validate the fix.
-* Review for regressions.
-* Review for security implications.
-* Perform final integration validation.
+- Reproduce or understand the reported problem.
+- Investigate the problem directly; investigation must not be delegated.
+- Identify the root cause.
+- Identify affected files.
+- Determine the smallest safe fix.
+- Delegate implementation only if explicitly authorized; otherwise implement directly.
+- Validate the fix.
+- Review for regressions.
+- Review for security implications.
+- Perform final integration validation.
 
 Do not start broad refactoring before identifying the root cause.
 
@@ -1292,16 +1321,16 @@ Do not start broad refactoring before identifying the root cause.
 
 For large features:
 
-* Break the feature into independent parts.
-* Identify dependencies between parts.
-* Assign clear ownership.
-* Parallelize only independent tasks.
-* Define shared interfaces before implementation when possible.
-* Implement components.
-* Validate components individually.
-* Integrate components.
-* Validate the complete flow.
-* Perform final code and security review.
+- Break the feature into independent parts.
+- Identify dependencies between parts.
+- If sub-agents were explicitly authorized, assign clear ownership and parallelize only independent tasks.
+- Otherwise, implement the parts directly in dependency order.
+- Define shared interfaces before implementation when possible.
+- Implement components.
+- Validate components individually.
+- Integrate components.
+- Validate the complete flow.
+- Perform final code and security review.
 
 ---
 
@@ -1313,6 +1342,6 @@ The goal is not to change as much code as possible.
 
 The goal is to produce the smallest, safest, correct implementation that satisfies the user's request.
 
-**Sub-agents implement.**
+**Sub-agents are optional and may be used only when the user explicitly requests them.**
 
-**The main agent plans, delegates, reviews, checks security, finds bugs, coordinates corrections, validates integration, and gives final approval.**
+**Sub-agents perform only the initial scoped implementation. The main agent owns investigation, planning, review, security, integration, error diagnosis, every correction, final validation, and approval.**

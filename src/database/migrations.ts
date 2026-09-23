@@ -19,4 +19,14 @@ CREATE INDEX IF NOT EXISTS reminders_scheduled_idx ON reminders(scheduled_at);
 CREATE INDEX IF NOT EXISTS inbox_created_idx ON inbox_items(created_at);
 `,
   },
+  {
+    version: 2,
+    name: '0001_global_pins',
+    description: 'Adiciona fixação global para tarefas, arquivos e espaços.',
+    sql: `
+ALTER TABLE tasks ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE attachments ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE spaces ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+`,
+  },
 ];

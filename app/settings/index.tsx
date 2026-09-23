@@ -1,7 +1,7 @@
 import { goBackOrHome } from '@/navigation/back';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StyleSheet, Switch, Text, useColorScheme, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, resolveThemeColors, spacing, typography } from '@/design/theme';
 import { useUIStore } from '@/stores/ui.store';
@@ -57,6 +57,7 @@ export default function Settings() {
     { label: 'Conta e sincronização', icon: 'person-outline' },
     { label: 'Notificações', icon: 'notifications-outline', onPress: () => router.push('/settings/notifications') },
     { label: 'Aparência', icon: 'color-palette-outline', onPress: () => router.push('/settings/appearance') },
+    { label: 'Armazenamento', icon: 'pie-chart-outline', onPress: () => router.push('/settings/storage') },
     { label: 'Privacidade', icon: 'lock-closed-outline' },
     { label: 'Exportar dados', icon: 'download-outline', onPress: () => router.push('/settings/backup') },
     { label: 'Ajuda e suporte', icon: 'help-circle-outline' },
@@ -80,7 +81,7 @@ export default function Settings() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
         <View style={[styles.row, { borderBottomColor: palette.line }]}>
           <View style={styles.iconWrap}>
             <Ionicons name="volume-medium-outline" size={18} color={palette.inkSoft} />
@@ -132,7 +133,7 @@ export default function Settings() {
             </AnimatedPressable>
           );
         })}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -154,7 +155,8 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.bodyStrong, color: colors.ink, fontSize: 18 },
   headerSpacer: { width: 36, height: 36 },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
+  content: { flex: 1 },
+  contentInner: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   row: {
     minHeight: 52,
     flexDirection: 'row',

@@ -178,7 +178,11 @@ export default function Calendar() {
         if (reducedMotion) dayIndicatorIndex.setValue(date.getDay());
         else {
           if (!isSameWeek(selected, date)) dayIndicatorIndex.setValue(direction > 0 ? -1 : 7);
-          Animated.spring(dayIndicatorIndex, { toValue: date.getDay(), ...motionSpring.selection, useNativeDriver: Platform.OS !== 'web' }).start();
+          Animated.spring(dayIndicatorIndex, {
+            toValue: date.getDay(),
+            ...motionSpring.selection,
+            useNativeDriver: Platform.OS !== 'web',
+          }).start();
         }
         setSelected(date);
         return;
@@ -241,7 +245,8 @@ export default function Calendar() {
           slideTo(addDays(selected, direction), direction);
         },
         onPanResponderTerminate: () => {
-          if (!reducedMotion) Animated.spring(daySwipeX, { toValue: 0, ...motionSpring.press, useNativeDriver: Platform.OS !== 'web' }).start(clearPreview);
+          if (!reducedMotion)
+            Animated.spring(daySwipeX, { toValue: 0, ...motionSpring.press, useNativeDriver: Platform.OS !== 'web' }).start(clearPreview);
           else {
             daySwipeX.setValue(0);
             clearPreview();

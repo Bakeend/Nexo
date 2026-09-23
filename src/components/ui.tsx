@@ -97,6 +97,7 @@ export function Header({
   onBack,
   action,
   actionLabel,
+  actionIcon,
   transparent = false,
 }: {
   title: string;
@@ -104,6 +105,7 @@ export function Header({
   onBack?: () => void;
   action?: () => void;
   actionLabel?: string;
+  actionIcon?: IconName;
   transparent?: boolean;
 }) {
   const styles = useThemeStyles(makeStyles);
@@ -115,7 +117,9 @@ export function Header({
         {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
       </View>
       {action ? (
-        actionLabel ? (
+        actionIcon ? (
+          <IconButton icon={actionIcon} onPress={action} label={actionLabel || 'Ação'} />
+        ) : actionLabel ? (
           <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel={actionLabel}

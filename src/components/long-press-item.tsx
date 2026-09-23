@@ -34,10 +34,18 @@ export function LongPressItem({
   const { showItemActions } = useItemActions();
   const reducedMotion = useReducedMotion();
   const [selected, setSelected] = useState(false);
+  const mounted = useRef(true);
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
   const selection = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      scale.stopAnimation();
+    };
+  }, [scale]);
   useEffect(() => {
     if (reducedMotion) selection.setValue(selected ? 1 : 0);
     else Animated.timing(selection, { toValue: selected ? 1 : 0, duration: motionDuration.normal, useNativeDriver: false }).start();
@@ -59,19 +67,23 @@ export function LongPressItem({
     setSelected(true);
     if (reducedMotion) {
       playUISound('selection-click');
-      showItemActions(title, actions, () => setSelected(false));
+      showItemActions(title, actions, () => {
+        if (mounted.current) setSelected(false);
+      });
       return;
     }
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.975, duration: 75, useNativeDriver: Platform.OS !== 'web' }),
       Animated.spring(scale, { toValue: 1, ...motionSpring.selection, useNativeDriver: Platform.OS !== 'web' }),
     ]).start(({ finished }) => {
+      if (!mounted.current) return;
       if (!finished) {
         setSelected(false);
         return;
       }
       playUISound('selection-click');
       showItemActions(title, actions, () => {
+        if (!mounted.current) return;
         setSelected(false);
         scale.setValue(1);
       });
@@ -79,29 +91,31 @@ export function LongPressItem({
   }, [actions, reducedMotion, scale, showItemActions, title]);
 
   return (
-    <Animated.View style={[styles.animated, { opacity, backgroundColor, borderColor, transform: [{ translateY }, { scale }] }]}>
-      <Pressable
-        accessibilityRole={containerRole}
-        accessibilityLabel={accessibilityLabel || title}
-        onPress={onPress}
-        onPressIn={() => {
-          if (!reducedMotion)
-            Animated.spring(scale, {
-              toValue: motionScale.listItem,
-              ...motionSpring.press,
-              useNativeDriver: Platform.OS !== 'web',
-            }).start();
-        }}
-        onPressOut={() => {
-          if (!reducedMotion && !selected)
-            Animated.spring(scale, { toValue: 1, ...motionSpring.press, useNativeDriver: Platform.OS !== 'web' }).start();
-        }}
-        onLongPress={onLongPress}
-        delayLongPress={delayLongPress}
-        style={({ pressed }) => [style, selected && selectedStyle, pressed && pressedStyle]}
-      >
-        {children}
-      </Pressable>
+    <Animated.View style={{ opacity, transform: [{ translateY }, { scale }] }}>
+      <Animated.View style={[styles.animated, { backgroundColor, borderColor }]}>
+        <Pressable
+          accessibilityRole={containerRole}
+          accessibilityLabel={accessibilityLabel || title}
+          onPress={onPress}
+          onPressIn={() => {
+            if (!reducedMotion)
+              Animated.spring(scale, {
+                toValue: motionScale.listItem,
+                ...motionSpring.press,
+                useNativeDriver: Platform.OS !== 'web',
+              }).start();
+          }}
+          onPressOut={() => {
+            if (!reducedMotion && !selected)
+              Animated.spring(scale, { toValue: 1, ...motionSpring.press, useNativeDriver: Platform.OS !== 'web' }).start();
+          }}
+          onLongPress={onLongPress}
+          delayLongPress={delayLongPress}
+          style={({ pressed }) => [style, selected && selectedStyle, pressed && pressedStyle]}
+        >
+          {children}
+        </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }

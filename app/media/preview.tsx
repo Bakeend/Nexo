@@ -9,7 +9,7 @@ import { AppDialog, BottomSheet, useItemActions, useSnackbar } from '@/component
 import { InlineAudioPlayer, useAudioPlaybackActions } from '@/components/audio-playback';
 import { LongPressItem } from '@/components/long-press-item';
 import { Header, Input, PrimaryButton } from '@/components/ui';
-import { findAttachment, findNote, trashAttachment, updateAttachment, updateNote } from '@/database/repositories';
+import { findAttachment, findNote, setPinnedItem, trashAttachment, updateAttachment, updateNote } from '@/database/repositories';
 import { shareAttachment } from '@/services/attachment-sharing';
 import type { Attachment } from '@/types/domain';
 import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
@@ -99,6 +99,12 @@ export default function MediaPreview() {
       goBackOrHome();
     });
   };
+  const pinAttachment = async (pinned: boolean) => {
+    if (!attachment) return;
+    await setPinnedItem('file', attachment.id, pinned);
+    setAttachment((current) => (current?.id === attachment.id ? { ...current, pinned } : current));
+    showSnackbar(pinned ? 'Anexo fixado' : 'Anexo desafixado', 'info');
+  };
 
   if (!attachment)
     return (
@@ -124,7 +130,16 @@ export default function MediaPreview() {
           <LongPressItem
             title={attachment.originalName || 'Imagem'}
             style={styles.imageActionTarget}
-            actions={attachmentActions(attachment, setRenameValue, setRenameOpen, showItemConfirmation, remove, toggle, showSnackbar)}
+            actions={attachmentActions(
+              attachment,
+              setRenameValue,
+              setRenameOpen,
+              showItemConfirmation,
+              remove,
+              toggle,
+              showSnackbar,
+              pinAttachment,
+            )}
           >
             <Animated.Image
               source={{ uri: displayUri }}
@@ -145,7 +160,16 @@ export default function MediaPreview() {
             <LongPressItem
               title={attachment.originalName || 'Áudio'}
               style={styles.previewActionTarget}
-              actions={attachmentActions(attachment, setRenameValue, setRenameOpen, showItemConfirmation, remove, toggle, showSnackbar)}
+              actions={attachmentActions(
+                attachment,
+                setRenameValue,
+                setRenameOpen,
+                showItemConfirmation,
+                remove,
+                toggle,
+                showSnackbar,
+                pinAttachment,
+              )}
             >
               <Text style={styles.title}>{attachment.originalName || 'Áudio salvo localmente'}</Text>
             </LongPressItem>
@@ -157,7 +181,16 @@ export default function MediaPreview() {
             <LongPressItem
               title={attachment.originalName || 'Arquivo'}
               style={styles.previewActionTarget}
-              actions={attachmentActions(attachment, setRenameValue, setRenameOpen, showItemConfirmation, remove, toggle, showSnackbar)}
+              actions={attachmentActions(
+                attachment,
+                setRenameValue,
+                setRenameOpen,
+                showItemConfirmation,
+                remove,
+                toggle,
+                showSnackbar,
+                pinAttachment,
+              )}
             >
               <Text style={styles.title}>{attachment.originalName || 'Arquivo'}</Text>
             </LongPressItem>
@@ -226,6 +259,7 @@ function attachmentActions(
   remove: () => Promise<void>,
   toggle: (attachmentId: string) => Promise<void>,
   showSnackbar: (message: string, tone?: 'success' | 'error' | 'info') => void,
+  pinAttachment: (pinned: boolean) => Promise<void>,
 ) {
   return [
     ...(attachment.type === 'audio'
@@ -238,6 +272,11 @@ function attachmentActions(
         setRenameValue(attachment.originalName || 'Anexo');
         setRenameOpen(true);
       },
+    },
+    {
+      label: attachment.pinned ? 'Desafixar' : 'Fixar',
+      icon: attachment.pinned ? ('pin-outline' as const) : ('pin' as const),
+      onPress: () => pinAttachment(!attachment.pinned),
     },
     {
       label: 'Compartilhar',

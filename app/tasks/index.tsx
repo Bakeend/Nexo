@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingButton, IconButton, Segmented } from '@/components/ui';
-import { listTasks, toggleTask, trashTask, updateTask } from '@/database/repositories';
+import { listTasks, setPinnedItem, toggleTask, trashTask, updateTask } from '@/database/repositories';
 import { colors, radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import type { Priority, Task } from '@/types/domain';
 import { Checkbox, useItemActions, useSnackbar } from '@/components/visual';
@@ -15,8 +15,18 @@ import { useReducedMotion } from '@/motion/useReducedMotion';
 import { playUISound } from '@/services/ui-sound-service';
 import { AnimatedListItem } from '@/motion/AnimatedListItem';
 import { motionDuration } from '@/motion/tokens';
+import type { TaskListFilter } from '@/features/tasks/task-date-filter';
+import { goBackOrHome } from '@/navigation/back';
 
-const tabs = ['Hoje', 'Próximas', 'Todas'];
+const tabs = ['Hoje', 'Atrasadas', 'Próximas', 'Sem data', 'Todas'] as const;
+type TaskTab = (typeof tabs)[number];
+const filterByTab: Record<TaskTab, TaskListFilter> = {
+  Hoje: 'today',
+  Atrasadas: 'overdue',
+  Próximas: 'upcoming',
+  'Sem data': 'no-date',
+  Todas: 'all',
+};
 
 function formatDueTime(value: string | null) {
   if (!value) return null;
@@ -36,7 +46,7 @@ export default function Tasks() {
   const { showSnackbar } = useSnackbar();
   const { showItemConfirmation } = useItemActions();
   const reducedMotion = useReducedMotion();
-  const [tab, setTab] = useState('Hoje');
+  const [tab, setTab] = useState<TaskTab>('Hoje');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [preview, setPreview] = useState<Record<string, boolean>>({});
   const [exiting, setExiting] = useState<Record<string, 'postpone' | 'delete'>>({});
@@ -44,7 +54,7 @@ export default function Tasks() {
 
   const load = useCallback(
     () =>
-      listTasks(tab === 'Hoje' ? 'today' : tab === 'Próximas' ? 'upcoming' : 'all').then((items) => {
+      listTasks(filterByTab[tab]).then((items) => {
         animateListLayout(reducedMotion);
         setTasks(items);
       }),
@@ -122,6 +132,15 @@ export default function Tasks() {
           actions={[
             { label: 'Editar', icon: 'create-outline', onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
             {
+              label: task.pinned ? 'Desafixar' : 'Fixar',
+              icon: task.pinned ? 'pin-outline' : 'pin',
+              onPress: async () => {
+                await setPinnedItem('task', task.id, !task.pinned);
+                showSnackbar(task.pinned ? 'Tarefa desafixada' : 'Tarefa fixada', 'info');
+                await load();
+              },
+            },
+            {
               label: completed ? 'Reabrir' : 'Concluir',
               icon: completed ? 'refresh-outline' : 'checkmark-circle-outline',
               onPress: () => void toggle(task),
@@ -197,6 +216,7 @@ export default function Tasks() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       <View style={styles.header}>
+        <IconButton icon="chevron-back" label="Voltar" onPress={goBackOrHome} />
         <Text style={styles.title}>Tarefas</Text>
         <IconButton
           icon="add"
@@ -210,7 +230,7 @@ export default function Tasks() {
       </View>
 
       <View style={styles.content}>
-        <Segmented values={tabs} selected={tab} onChange={setTab} />
+        <Segmented values={[...tabs]} selected={tab} onChange={(value) => setTab(value as TaskTab)} />
 
         <View style={styles.list}>
           {openTasks.length ? openTasks.map((task) => renderTask(task)) : <Text style={styles.emptyText}>Nenhuma tarefa nesta lista.</Text>}
@@ -240,15 +260,9 @@ const makeStyles = (colors: AppColors) =>
       paddingHorizontal: spacing.lg,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: spacing.sm,
     },
-    title: { ...typography.heading, color: colors.ink, fontSize: 20 },
-    headerAction: {
-      width: 36,
-      height: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+    title: { ...typography.heading, flex: 1, color: colors.ink, fontSize: 20 },
     content: { flex: 1, paddingHorizontal: spacing.lg },
     segmented: {
       height: 38,

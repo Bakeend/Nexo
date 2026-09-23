@@ -7,6 +7,7 @@ import { EmptyState, FloatingButton, Header, ListRow } from '@/components/ui';
 import { listNotes, trashNote, updateNote } from '@/database/repositories';
 import type { Note } from '@/types/domain';
 import { useItemActions, useSnackbar } from '@/components/visual';
+import { goBackOrHome } from '@/navigation/back';
 export default function Notes() {
   const styles = useThemeStyles(makeStyles);
   const [items, setItems] = useState<Note[]>([]);
@@ -20,7 +21,7 @@ export default function Notes() {
   );
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <Header title="Notas" action={() => router.push('/notes/new')} actionLabel="+" />
+      <Header title="Notas" onBack={goBackOrHome} action={() => router.push('/notes/new')} actionIcon="add" actionLabel="Nova nota" />
       <View style={styles.content}>
         {items.length ? (
           items.map((note) => (
@@ -36,6 +37,16 @@ export default function Notes() {
                   label: 'Editar',
                   icon: 'create-outline',
                   onPress: () => router.push({ pathname: '/notes/new', params: { id: note.id } }),
+                },
+                {
+                  label: 'Criar tarefa vinculada',
+                  description: 'Usar esta nota como contexto da tarefa',
+                  icon: 'checkmark-circle-outline',
+                  onPress: () =>
+                    router.push({
+                      pathname: '/tasks/new',
+                      params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '' },
+                    }),
                 },
                 {
                   label: note.pinned ? 'Desafixar' : 'Fixar',

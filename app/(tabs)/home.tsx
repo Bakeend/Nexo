@@ -18,16 +18,18 @@ import {
   completeReminder,
   listInbox,
   listNotes,
+  listPinnedItems,
   listReminders,
   listTasks,
   toggleTask,
   trashNote,
   trashReminder,
   trashTask,
+  setPinnedItem,
   updateNote,
   updateTask,
 } from '@/database/repositories';
-import type { Note, Reminder, Task } from '@/types/domain';
+import type { Note, PinnedItem, Reminder, Task } from '@/types/domain';
 import { cancelReminder, createNextRecurringReminder, snoozeReminder } from '@/services/notification-service';
 
 type AgendaItem = { id: string; title: string; date: string; kind: 'task' | 'reminder' };
@@ -42,6 +44,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [pinnedItems, setPinnedItems] = useState<PinnedItem[]>([]);
   const [inboxCount, setInboxCount] = useState(0);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [taskPreview, setTaskPreview] = useState<Record<string, boolean>>({});
@@ -54,17 +57,18 @@ export default function Home() {
   const { showItemConfirmation } = useItemActions();
 
   const load = useCallback(async () => {
-    const [todayTasks, allTasks, allReminders, recentNotes, inbox] = await Promise.all([
+    const [todayTasks, allReminders, recentNotes, inbox, nextPinnedItems] = await Promise.all([
       listTasks('today'),
-      listTasks('all'),
       listReminders(),
       listNotes(),
       listInbox(),
+      listPinnedItems(),
     ]);
     animateListLayout(reducedMotion);
-    setTasks(todayTasks.length ? todayTasks : allTasks.filter((task) => !task.completedAt).slice(0, 5));
+    setTasks(todayTasks);
     setReminders(allReminders);
     setNotes(recentNotes);
+    setPinnedItems(nextPinnedItems);
     setInboxCount(inbox.length);
   }, [reducedMotion]);
 
@@ -148,6 +152,15 @@ export default function Home() {
   };
   const taskActions = (task: Task) => [
     { label: 'Editar', icon: 'create-outline' as const, onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
+    {
+      label: task.pinned ? 'Desafixar' : 'Fixar',
+      icon: task.pinned ? ('pin-outline' as const) : ('pin' as const),
+      onPress: async () => {
+        await setPinnedItem('task', task.id, !task.pinned);
+        showSnackbar(task.pinned ? 'Tarefa desafixada' : 'Tarefa fixada', 'info');
+        await load();
+      },
+    },
     {
       label: task.completedAt ? 'Reabrir' : 'Concluir',
       icon: task.completedAt ? ('refresh-outline' as const) : ('checkmark-circle-outline' as const),
@@ -236,7 +249,6 @@ export default function Home() {
                 <Text style={styles.greeting}>{greeting}, Vini</Text>
                 <Text style={styles.wave} accessibilityLabel="Saudação">
                   {greetingEmoji}
-                  👋
                 </Text>
               </View>
               <Text style={styles.date}>{dateLabel}</Text>
@@ -255,6 +267,62 @@ export default function Home() {
           </AnimatedListItem>
         ) : null}
 
+        {pinnedItems.length ? (
+          <>
+            <View style={styles.pinnedSectionHeading}>
+              <Ionicons name="pin" size={14} color={colors.accent} />
+              <Text style={styles.pinnedSectionTitle}>Fixados</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pinnedList}>
+              {pinnedItems.map((item) => (
+                <LongPressItem
+                  key={`${item.type}-${item.id}`}
+                  title={item.title}
+                  style={styles.pinnedItem}
+                  pressedStyle={styles.rowPressed}
+                  onPress={() => {
+                    if (item.type === 'note') router.push({ pathname: '/notes/[id]', params: { id: item.id } });
+                    if (item.type === 'task') router.push({ pathname: '/tasks/[id]', params: { id: item.id } });
+                    if (item.type === 'file') router.push({ pathname: '/media/preview', params: { id: item.id } });
+                    if (item.type === 'space') router.push({ pathname: '/spaces/[id]', params: { id: item.id } });
+                  }}
+                  actions={[
+                    {
+                      label: 'Desafixar',
+                      icon: 'pin-outline',
+                      onPress: async () => {
+                        await setPinnedItem(item.type, item.id, false);
+                        showSnackbar('Item removido de Fixados', 'info');
+                        await load();
+                      },
+                    },
+                  ]}
+                >
+                  <View style={styles.pinnedItemTop}>
+                    <Ionicons
+                      name={
+                        item.type === 'note'
+                          ? 'document-text-outline'
+                          : item.type === 'task'
+                            ? 'checkmark-circle-outline'
+                            : item.type === 'file'
+                              ? 'document-attach-outline'
+                              : 'grid-outline'
+                      }
+                      size={17}
+                      color={colors.accent}
+                    />
+                    <Ionicons name="pin" size={14} color={colors.inkMuted} />
+                  </View>
+                  <Text style={styles.pinnedItemTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.pinnedItemSubtitle}>{item.subtitle}</Text>
+                </LongPressItem>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
         {next ? (
           <>
             <SectionTitle title="Próximo" />
@@ -363,6 +431,16 @@ export default function Home() {
                       onPress: () => router.push({ pathname: '/notes/new', params: { id: note.id } }),
                     },
                     {
+                      label: 'Criar tarefa vinculada',
+                      description: 'Usar esta nota como contexto da tarefa',
+                      icon: 'checkmark-circle-outline',
+                      onPress: () =>
+                        router.push({
+                          pathname: '/tasks/new',
+                          params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '' },
+                        }),
+                    },
+                    {
                       label: note.pinned ? 'Desafixar' : 'Fixar',
                       icon: note.pinned ? 'pin-outline' : 'pin',
                       onPress: () => updateNote(note.id, { pinned: !note.pinned }).then(load),
@@ -411,6 +489,22 @@ export default function Home() {
 
         <SectionTitle title="Navegar" />
         <View style={styles.listCard}>
+          <ListRow icon="today-outline" title="Hoje" subtitle="Sua agenda do dia" onPress={() => router.push('/today')} />
+          <ListRow
+            icon="checkmark-circle-outline"
+            title="Tarefas"
+            subtitle="Acompanhe o que precisa ser feito"
+            onPress={() => router.push('/tasks')}
+          />
+          <ListRow icon="document-text-outline" title="Notas" subtitle="Suas anotações" onPress={() => router.push('/notes')} />
+          <ListRow icon="notifications-outline" title="Lembretes" subtitle="Seus alertas" onPress={() => router.push('/reminders')} />
+          <ListRow icon="calendar-outline" title="Calendário" subtitle="Tarefas e compromissos" onPress={() => router.push('/calendar')} />
+          <ListRow
+            icon="document-attach-outline"
+            title="Arquivos"
+            subtitle="Anexos importados"
+            onPress={() => router.push('/files' as never)}
+          />
           <ListRow
             icon="file-tray-outline"
             title="Caixa de entrada"
@@ -418,6 +512,8 @@ export default function Home() {
             onPress={() => router.push('/inbox')}
           />
           <ListRow icon="grid-outline" title="Espaços" subtitle="Organize por contexto" onPress={() => router.push('/spaces')} />
+          <ListRow icon="pricetag-outline" title="Tags" subtitle="Organize por assunto" onPress={() => router.push('/tags' as never)} />
+          <ListRow icon="trash-outline" title="Lixeira" subtitle="Itens excluídos" onPress={() => router.push('/trash' as never)} />
           <ListRow icon="search-outline" title="Tudo" subtitle="Pesquisar no Nexo" onPress={() => router.push('/search')} />
         </View>
       </ScrollView>
@@ -463,6 +559,32 @@ const makeStyles = (colors: AppColors) =>
     wave: { fontSize: 23, lineHeight: 28 },
     date: { ...typography.caption, color: colors.inkMuted, marginTop: 4, textTransform: 'capitalize' },
     stats: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+    pinnedSectionHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginTop: spacing.xl,
+      marginBottom: spacing.sm,
+    },
+    pinnedSectionTitle: {
+      ...typography.caption,
+      color: colors.inkMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      fontWeight: '700',
+    },
+    pinnedList: { gap: spacing.sm, paddingBottom: spacing.md },
+    pinnedItem: {
+      width: 148,
+      minHeight: 82,
+      justifyContent: 'space-between',
+      padding: spacing.sm,
+      borderRadius: radius.md,
+      backgroundColor: colors.surface,
+    },
+    pinnedItemTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    pinnedItemTitle: { ...typography.bodyStrong, color: colors.ink, marginTop: spacing.xs },
+    pinnedItemSubtitle: { ...typography.meta, color: colors.inkMuted },
     statCard: {
       flex: 1,
       minHeight: 72,
