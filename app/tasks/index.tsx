@@ -1,13 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
+import { addDays } from 'date-fns';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FloatingButton } from '@/components/ui';
-import { listTasks, toggleTask } from '@/database/repositories';
-import { colors, radius, spacing, typography } from '@/design/theme';
+import { FloatingButton, IconButton, Segmented } from '@/components/ui';
+import { listTasks, toggleTask, trashTask, updateTask } from '@/database/repositories';
+import { colors, radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import type { Priority, Task } from '@/types/domain';
-import { useSnackbar } from '@/components/visual';
+import { Checkbox, useItemActions, useSnackbar } from '@/components/visual';
+import { LongPressItem } from '@/components/long-press-item';
+import { animateListLayout } from '@/motion/layout';
+import { useReducedMotion } from '@/motion/useReducedMotion';
+import { playUISound } from '@/services/ui-sound-service';
+import { AnimatedListItem } from '@/motion/AnimatedListItem';
+import { motionDuration } from '@/motion/tokens';
 
 const tabs = ['Hoje', 'Próximas', 'Todas'];
 
@@ -24,11 +31,25 @@ function priorityLabel(priority: Priority) {
 }
 
 export default function Tasks() {
+  const colors = useThemeColors();
+  const styles = useThemeStyles(makeStyles);
   const { showSnackbar } = useSnackbar();
+  const { showItemConfirmation } = useItemActions();
+  const reducedMotion = useReducedMotion();
   const [tab, setTab] = useState('Hoje');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [preview, setPreview] = useState<Record<string, boolean>>({});
+  const [exiting, setExiting] = useState<Record<string, 'postpone' | 'delete'>>({});
+  const pendingExits = useRef(new Map<string, () => Promise<void>>());
 
-  const load = useCallback(() => listTasks(tab === 'Hoje' ? 'today' : tab === 'Próximas' ? 'upcoming' : 'all').then(setTasks), [tab]);
+  const load = useCallback(
+    () =>
+      listTasks(tab === 'Hoje' ? 'today' : tab === 'Próximas' ? 'upcoming' : 'all').then((items) => {
+        animateListLayout(reducedMotion);
+        setTasks(items);
+      }),
+    [reducedMotion, tab],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -39,51 +60,137 @@ export default function Tasks() {
   const openTasks = useMemo(() => tasks.filter((task) => !task.completedAt), [tasks]);
   const completedTasks = useMemo(() => tasks.filter((task) => Boolean(task.completedAt)), [tasks]);
 
+  const toggle = async (task: Task, playSound = true) => {
+    if (task.id in preview) return;
+    const complete = !task.completedAt;
+    setPreview((current) => ({ ...current, [task.id]: complete }));
+    await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 80 : motionDuration.normal));
+    try {
+      await toggleTask(task.id, complete);
+      if (playSound) playUISound(complete ? 'complete' : 'undo-soft');
+      showSnackbar(complete ? 'Tarefa concluída' : 'Tarefa reaberta', complete ? 'success' : 'info');
+      await load();
+    } finally {
+      setPreview((current) => {
+        const next = { ...current };
+        delete next[task.id];
+        return next;
+      });
+    }
+  };
+
+  const exitThen = (taskId: string, action: () => Promise<void>, kind: 'postpone' | 'delete') => {
+    if (pendingExits.current.has(taskId)) return;
+    pendingExits.current.set(taskId, action);
+    animateListLayout(reducedMotion);
+    setExiting((current) => ({ ...current, [taskId]: kind }));
+  };
+
+  const finishExit = async (taskId: string) => {
+    const action = pendingExits.current.get(taskId);
+    if (!action) return;
+    pendingExits.current.delete(taskId);
+    try {
+      await action();
+    } finally {
+      setExiting((current) => {
+        const next = { ...current };
+        delete next[taskId];
+        return next;
+      });
+    }
+  };
+
   const renderTask = (task: Task, completed = false) => {
     const dueTime = formatDueTime(task.dueAt);
     const priority = priorityLabel(task.priority);
+    const checked = preview[task.id] ?? completed;
 
     return (
-      <Pressable
+      <AnimatedListItem
         key={task.id}
-        onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: task.id } })}
-        style={({ pressed }) => [styles.taskRow, pressed && styles.rowPressed, completed && styles.completedRow]}
+        style={{ marginLeft: exiting[task.id] === 'postpone' && !reducedMotion ? 16 : 0 }}
+        exiting={Boolean(exiting[task.id])}
+        onExitComplete={() => void finishExit(task.id)}
       >
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: completed }}
-          accessibilityLabel={completed ? 'Marcar como pendente' : 'Marcar como concluída'}
-          onPress={(event) => {
-            event.stopPropagation();
-            toggleTask(task.id, !completed).then(() => {
-              showSnackbar(completed ? 'Tarefa reaberta' : 'Tarefa concluída');
-              load();
-            });
-          }}
-          style={[styles.checkbox, completed && styles.checkboxCompleted]}
-          hitSlop={8}
+        <LongPressItem
+          title={task.title}
+          accessibilityLabel={`Tarefa: ${task.title}`}
+          onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: task.id } })}
+          style={[styles.taskRow, checked && styles.completedRow]}
+          pressedStyle={styles.rowPressed}
+          actions={[
+            { label: 'Editar', icon: 'create-outline', onPress: () => router.push({ pathname: '/tasks/new', params: { id: task.id } }) },
+            {
+              label: completed ? 'Reabrir' : 'Concluir',
+              icon: completed ? 'refresh-outline' : 'checkmark-circle-outline',
+              onPress: () => void toggle(task),
+            },
+            {
+              label: 'Adiar para amanhã',
+              icon: 'time-outline',
+              onPress: () =>
+                exitThen(
+                  task.id,
+                  async () => {
+                    const dueAt = addDays(task.dueAt ? new Date(task.dueAt) : new Date(), 1).toISOString();
+                    await updateTask(task.id, { dueAt });
+                    playUISound('swipe-soft');
+                    showSnackbar('Tarefa adiada para amanhã', 'info');
+                    await load();
+                  },
+                  'postpone',
+                ),
+            },
+            {
+              label: 'Excluir',
+              icon: 'trash-outline',
+              destructive: true,
+              onPress: () =>
+                showItemConfirmation({
+                  title: 'Excluir esta tarefa?',
+                  message: 'A tarefa poderá ser restaurada pela lixeira.',
+                  confirmLabel: 'Excluir',
+                  onConfirm: () =>
+                    exitThen(
+                      task.id,
+                      async () => {
+                        await trashTask(task.id);
+                        playUISound('swipe-soft');
+                        showSnackbar('Tarefa excluída', 'info');
+                        await load();
+                      },
+                      'delete',
+                    ),
+                }),
+            },
+          ]}
         >
-          {completed ? <Ionicons name="checkmark" size={13} color={colors.white} /> : null}
-        </Pressable>
+          <Checkbox
+            checked={checked}
+            label={completed ? 'Marcar como pendente' : 'Marcar como concluída'}
+            onPress={() => void toggle(task, false)}
+          />
 
-        <View style={styles.taskCopy}>
-          <Text style={[styles.taskTitle, completed && styles.completedText]} numberOfLines={1}>
-            {task.title}
-          </Text>
-          {dueTime ? <Text style={[styles.taskMeta, completed && styles.completedText]}>{dueTime}</Text> : null}
-        </View>
-
-        {priority && !completed ? (
-          <View
-            style={[
-              styles.priorityPill,
-              task.priority === 'high' ? styles.priorityHigh : task.priority === 'medium' ? styles.priorityMedium : styles.priorityLow,
-            ]}
-          >
-            <Text style={[styles.priorityText, task.priority === 'high' && styles.priorityHighText]}>{priority}</Text>
+          <View style={styles.taskCopy}>
+            <Text style={[styles.taskTitle, checked && styles.completedText]} numberOfLines={1}>
+              {task.title}
+            </Text>
+            {dueTime ? <Text style={[styles.taskMeta, checked && styles.completedText]}>{dueTime}</Text> : null}
           </View>
-        ) : null}
-      </Pressable>
+
+          {priority && !completed ? (
+            <View
+              style={[
+                styles.priorityPill,
+                task.priority === 'high' ? styles.priorityHigh : task.priority === 'medium' ? styles.priorityMedium : styles.priorityLow,
+              ]}
+            >
+              <Text style={[styles.priorityText, task.priority === 'high' && styles.priorityHighText]}>{priority}</Text>
+            </View>
+          ) : null}
+        </LongPressItem>
+      </AnimatedListItem>
     );
   };
 
@@ -91,29 +198,19 @@ export default function Tasks() {
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>Tarefas</Text>
-        <Pressable
-          onPress={() => router.push('/tasks/new')}
-          accessibilityRole="button"
-          accessibilityLabel="Nova tarefa"
-          hitSlop={10}
-          style={styles.headerAction}
-        >
-          <Ionicons name="add" size={27} color={colors.ink} />
-        </Pressable>
+        <IconButton
+          icon="add"
+          size={27}
+          label="Nova tarefa"
+          onPress={() => {
+            playUISound('pop');
+            router.push('/tasks/new');
+          }}
+        />
       </View>
 
       <View style={styles.content}>
-        <View style={styles.segmented}>
-          {tabs.map((item) => {
-            const selected = tab === item;
-            return (
-              <Pressable key={item} onPress={() => setTab(item)} style={styles.segment}>
-                <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{item}</Text>
-                {selected ? <View style={styles.segmentIndicator} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
+        <Segmented values={tabs} selected={tab} onChange={setTab} />
 
         <View style={styles.list}>
           {openTasks.length ? openTasks.map((task) => renderTask(task)) : <Text style={styles.emptyText}>Nenhuma tarefa nesta lista.</Text>}
@@ -135,99 +232,100 @@ export default function Tasks() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
-  header: {
-    minHeight: 62,
-    paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: { ...typography.heading, color: colors.ink, fontSize: 20 },
-  headerAction: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
-  segmented: {
-    height: 38,
-    paddingHorizontal: 3,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceMuted,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  segmentText: { ...typography.caption, color: colors.inkMuted },
-  segmentTextSelected: { color: colors.accent, fontWeight: '700' },
-  segmentIndicator: {
-    position: 'absolute',
-    bottom: 1,
-    width: 30,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: colors.accent,
-  },
-  list: { paddingTop: spacing.sm, paddingBottom: 96 },
-  taskRow: {
-    minHeight: 54,
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'center',
-    paddingHorizontal: 2,
-  },
-  rowPressed: { backgroundColor: colors.surfacePressed },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.4,
-    borderColor: colors.inkSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxCompleted: {
-    backgroundColor: '#B7BECD',
-    borderColor: '#B7BECD',
-  },
-  taskCopy: { flex: 1, justifyContent: 'center' },
-  taskTitle: { ...typography.body, color: colors.ink },
-  taskMeta: { ...typography.meta, color: colors.inkMuted, marginTop: 1 },
-  priorityPill: {
-    minWidth: 40,
-    height: 24,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  priorityHigh: { backgroundColor: colors.dangerSoft },
-  priorityMedium: { backgroundColor: colors.warningSoft },
-  priorityLow: { backgroundColor: colors.accentSoft },
-  priorityText: { ...typography.meta, color: colors.inkSoft, fontWeight: '700' },
-  priorityHighText: { color: colors.danger },
-  emptyText: {
-    ...typography.caption,
-    color: colors.inkMuted,
-    paddingVertical: spacing.xl,
-    textAlign: 'center',
-  },
-  completedSection: { marginTop: spacing.md },
-  completedHeader: {
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  completedTitle: { ...typography.caption, color: colors.inkSoft, fontWeight: '700' },
-  completedRow: { opacity: 0.72 },
-  completedText: { color: colors.inkMuted },
-});
+const makeStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.surface },
+    header: {
+      minHeight: 62,
+      paddingHorizontal: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    title: { ...typography.heading, color: colors.ink, fontSize: 20 },
+    headerAction: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: { flex: 1, paddingHorizontal: spacing.lg },
+    segmented: {
+      height: 38,
+      paddingHorizontal: 3,
+      borderRadius: radius.lg,
+      backgroundColor: colors.surfaceMuted,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    segment: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    segmentText: { ...typography.caption, color: colors.inkMuted },
+    segmentTextSelected: { color: colors.accent, fontWeight: '700' },
+    segmentIndicator: {
+      position: 'absolute',
+      bottom: 1,
+      width: 30,
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: colors.accent,
+    },
+    list: { paddingTop: spacing.sm, paddingBottom: 96 },
+    taskRow: {
+      minHeight: 54,
+      flexDirection: 'row',
+      gap: spacing.md,
+      alignItems: 'center',
+      paddingHorizontal: 2,
+    },
+    rowPressed: { backgroundColor: colors.surfacePressed },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 1.4,
+      borderColor: colors.inkSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxCompleted: {
+      backgroundColor: '#B7BECD',
+      borderColor: '#B7BECD',
+    },
+    taskCopy: { flex: 1, justifyContent: 'center' },
+    taskTitle: { ...typography.body, color: colors.ink },
+    taskMeta: { ...typography.meta, color: colors.inkMuted, marginTop: 1 },
+    priorityPill: {
+      minWidth: 40,
+      height: 24,
+      borderRadius: radius.pill,
+      paddingHorizontal: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    priorityHigh: { backgroundColor: colors.dangerSoft },
+    priorityMedium: { backgroundColor: colors.warningSoft },
+    priorityLow: { backgroundColor: colors.accentSoft },
+    priorityText: { ...typography.meta, color: colors.inkSoft, fontWeight: '700' },
+    priorityHighText: { color: colors.danger },
+    emptyText: {
+      ...typography.caption,
+      color: colors.inkMuted,
+      paddingVertical: spacing.xl,
+      textAlign: 'center',
+    },
+    completedSection: { marginTop: spacing.md },
+    completedHeader: {
+      minHeight: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    completedTitle: { ...typography.caption, color: colors.inkSoft, fontWeight: '700' },
+    completedRow: { opacity: 0.72 },
+    completedText: { color: colors.inkMuted },
+  });

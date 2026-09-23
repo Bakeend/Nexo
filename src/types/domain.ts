@@ -10,11 +10,14 @@ export type RepeatRule =
   | { type: 'custom'; interval: number; unit: 'day' | 'week' | 'month'; daysOfWeek?: number[] }
   | null;
 
+export type NoteTextStyle = 'bold' | 'italic' | 'underline' | 'strike';
+export type NoteTextMark = { start: number; end: number; styles: NoteTextStyle[] };
+
 export type NoteBlock =
-  | { type: 'text'; text: string }
-  | { type: 'heading'; level: 1 | 2; text: string }
+  | { type: 'text'; text: string; marks?: NoteTextMark[] }
+  | { type: 'heading'; level: 1 | 2; text: string; marks?: NoteTextMark[] }
   | { type: 'checklist'; items: { id: string; text: string; checked: boolean }[] }
-  | { type: 'bullet'; text: string }
+  | { type: 'bullet'; text: string; marks?: NoteTextMark[] }
   | { type: 'link'; text: string; url: string }
   | { type: 'image' | 'file' | 'audio'; attachmentId: string; label?: string };
 

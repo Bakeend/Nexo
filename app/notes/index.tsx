@@ -1,19 +1,25 @@
 import { router, useFocusEffect } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@/design/theme';
+import { colors, spacing, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import { EmptyState, FloatingButton, Header, ListRow } from '@/components/ui';
-import { listNotes } from '@/database/repositories';
+import { listNotes, trashNote, updateNote } from '@/database/repositories';
 import type { Note } from '@/types/domain';
+import { useItemActions, useSnackbar } from '@/components/visual';
 export default function Notes() {
+  const styles = useThemeStyles(makeStyles);
   const [items, setItems] = useState<Note[]>([]);
+  const { showItemConfirmation } = useItemActions();
+  const { showSnackbar } = useSnackbar();
+  const load = useCallback(() => listNotes().then(setItems), []);
   useFocusEffect(
     useCallback(() => {
-      listNotes().then(setItems);
-    }, []),
+      load();
+    }, [load]),
   );
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={['top']} style={styles.root}>
       <Header title="Notas" action={() => router.push('/notes/new')} actionLabel="+" />
       <View style={styles.content}>
         {items.length ? (
@@ -24,6 +30,35 @@ export default function Notes() {
               title={note.title || 'Nota sem título'}
               subtitle={`Modificada ${new Date(note.updatedAt).toLocaleDateString('pt-BR')}`}
               onPress={() => router.push({ pathname: '/notes/[id]', params: { id: note.id } })}
+              longPressTitle={note.title || 'Nota'}
+              longPressActions={[
+                {
+                  label: 'Editar',
+                  icon: 'create-outline',
+                  onPress: () => router.push({ pathname: '/notes/new', params: { id: note.id } }),
+                },
+                {
+                  label: note.pinned ? 'Desafixar' : 'Fixar',
+                  icon: note.pinned ? 'pin-outline' : 'pin',
+                  onPress: () => updateNote(note.id, { pinned: !note.pinned }).then(load),
+                },
+                {
+                  label: 'Excluir',
+                  icon: 'trash-outline',
+                  destructive: true,
+                  onPress: () =>
+                    showItemConfirmation({
+                      title: 'Excluir esta nota?',
+                      message: 'A nota poderá ser restaurada pela lixeira.',
+                      confirmLabel: 'Excluir',
+                      onConfirm: async () => {
+                        await trashNote(note.id);
+                        showSnackbar('Nota enviada para a lixeira', 'info');
+                        await load();
+                      },
+                    }),
+                },
+              ]}
             />
           ))
         ) : (
@@ -37,10 +72,18 @@ export default function Notes() {
         )}
       </View>
       <FloatingButton onPress={() => router.push('/notes/new')} bottom={24} />
-    </View>
+    </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.canvas },
-  content: { flex: 1, margin: spacing.lg, marginTop: 0, paddingHorizontal: spacing.md, backgroundColor: colors.surface, borderRadius: 18 },
-});
+const makeStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.canvas },
+    content: {
+      flex: 1,
+      margin: spacing.lg,
+      marginTop: 0,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+    },
+  });

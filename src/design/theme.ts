@@ -1,4 +1,6 @@
-import { Platform } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
+import { useMemo } from 'react';
+import { useUIStore } from '@/stores/ui.store';
 
 export const colors = {
   canvas: '#F7F8FB',
@@ -19,8 +21,54 @@ export const colors = {
   danger: '#E05252',
   dangerSoft: '#FFF0F0',
   white: '#FFFFFF',
+  onInk: '#FFFFFF',
+  onAccent: '#FFFFFF',
   scrim: 'rgba(17, 24, 39, 0.55)',
 };
+
+export type ThemePreference = 'light' | 'dark' | 'system';
+export type AppColors = typeof colors;
+
+export const darkColors: AppColors = {
+  canvas: '#10141F',
+  surface: '#1A2030',
+  surfaceMuted: '#252D40',
+  surfacePressed: '#303A50',
+  ink: '#F5F7FC',
+  inkSoft: '#CDD4E3',
+  inkMuted: '#A4AEC2',
+  line: '#354057',
+  accent: '#8BA4FF',
+  accentSoft: '#28365B',
+  accentDark: '#C4D0FF',
+  success: '#65D1AC',
+  successSoft: '#1C4239',
+  warning: '#F4B66B',
+  warningSoft: '#493824',
+  danger: '#FF8989',
+  dangerSoft: '#4A292E',
+  white: '#FFFFFF',
+  onInk: '#10141F',
+  onAccent: '#10141F',
+  scrim: 'rgba(0, 0, 0, 0.68)',
+};
+
+export function resolveThemeColors(
+  preference: ThemePreference,
+  systemScheme: 'light' | 'dark' | 'unspecified' | null | undefined,
+): AppColors {
+  return preference === 'dark' || (preference === 'system' && systemScheme === 'dark') ? darkColors : colors;
+}
+
+export function useThemeColors(): AppColors {
+  const preference = useUIStore((state) => state.theme);
+  return resolveThemeColors(preference, useColorScheme());
+}
+
+export function useThemeStyles<T>(factory: (palette: AppColors) => T): T {
+  const palette = useThemeColors();
+  return useMemo(() => factory(palette), [factory, palette]);
+}
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 } as const;

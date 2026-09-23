@@ -1,24 +1,40 @@
 import { router, Stack } from 'expo-router';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/design/theme';
 import { SnackbarProvider } from '@/components/visual';
+import { AudioPlaybackProvider } from '@/components/audio-playback';
 import { initializeDatabase } from '@/database/database';
 import { getSetting, seedDefaults } from '@/database/repositories';
 import { reconcileReminders } from '@/services/notification-service';
 import { useUIStore } from '@/stores/ui.store';
+import { preloadTypingSound, preloadUISounds } from '@/services/ui-sound-service';
+import { StatusBar } from 'expo-status-bar';
+import { resolveThemeColors } from '@/design/theme';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  const preference = useUIStore((state) => state.theme);
+  const systemScheme = useColorScheme();
+  const themeColors = resolveThemeColors(preference, systemScheme);
+  const isDark = themeColors !== colors;
   useEffect(() => {
     initializeDatabase()
       .then(seedDefaults)
       .then(async () => {
-        const savedTheme = await getSetting('theme');
+        const [savedTheme, savedUISounds, savedTypingSound] = await Promise.all([
+          getSetting('theme'),
+          getSetting('ui_sounds_enabled'),
+          getSetting('typing_sound_enabled'),
+        ]);
         if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') useUIStore.getState().setTheme(savedTheme);
+        useUIStore.getState().setUISoundsEnabled(savedUISounds !== 'false');
+        useUIStore.getState().setTypingSoundEnabled(savedTypingSound === 'true');
+        if (savedUISounds !== 'false') preloadUISounds();
+        if (savedTypingSound === 'true') preloadTypingSound();
         await reconcileReminders().catch(() => undefined);
         setReady(true);
       })
@@ -48,28 +64,31 @@ export default function RootLayout() {
     );
   return (
     <SafeAreaProvider>
-      <SnackbarProvider>
-        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="notes/new" options={{ presentation: 'card' }} />
-          <Stack.Screen name="notes/[id]" />
-          <Stack.Screen name="tasks/new" />
-          <Stack.Screen name="tasks/[id]" />
-          <Stack.Screen name="reminders/new" />
-          <Stack.Screen name="reminders/[id]" />
-          <Stack.Screen name="calendar" />
-          <Stack.Screen name="search" />
-          <Stack.Screen name="settings/index" />
-          <Stack.Screen name="files" />
-          <Stack.Screen name="media/image" />
-          <Stack.Screen name="media/audio" />
-          <Stack.Screen name="media/preview" />
-          <Stack.Screen name="tags" />
-          <Stack.Screen name="trash" />
-        </Stack>
-      </SnackbarProvider>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <AudioPlaybackProvider>
+        <SnackbarProvider>
+          <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="notes/new" options={{ presentation: 'card' }} />
+            <Stack.Screen name="notes/[id]" />
+            <Stack.Screen name="tasks/new" />
+            <Stack.Screen name="tasks/[id]" />
+            <Stack.Screen name="reminders/new" />
+            <Stack.Screen name="reminders/[id]" />
+            <Stack.Screen name="calendar" />
+            <Stack.Screen name="search" />
+            <Stack.Screen name="settings/index" />
+            <Stack.Screen name="files" />
+            <Stack.Screen name="media/image" />
+            <Stack.Screen name="media/audio" />
+            <Stack.Screen name="media/preview" />
+            <Stack.Screen name="tags" />
+            <Stack.Screen name="trash" />
+          </Stack>
+        </SnackbarProvider>
+      </AudioPlaybackProvider>
     </SafeAreaProvider>
   );
 }

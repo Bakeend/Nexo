@@ -1,4 +1,5 @@
 import { and, desc, eq, isNotNull, isNull, like, or } from 'drizzle-orm';
+import { Platform } from 'react-native';
 import { db } from './database';
 import { attachments, inboxItems, itemTags, notes, reminders, settings, spaces, tags, tasks } from './schema';
 import { newId, nowIso } from '@/utils/ids';
@@ -17,6 +18,7 @@ import type {
   Tag,
 } from '@/types/domain';
 import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
+import { publishNoteBlockChange } from '@/services/note-block-events';
 
 const ruleFromDb = (value: string | null): RepeatRule => {
   if (!value) return null;
@@ -29,10 +31,25 @@ const ruleFromDb = (value: string | null): RepeatRule => {
 const ruleToDb = (value: RepeatRule) => (value ? JSON.stringify(value) : null);
 
 export async function getSetting(key: string) {
+  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(`nexo:setting:${key}`);
+      if (stored !== null) return stored;
+    } catch {
+      // Storage can be unavailable in a private browser context.
+    }
+  }
   const row = await db.select().from(settings).where(eq(settings.key, key)).get();
   return row?.value ?? null;
 }
 export async function setSetting(key: string, value: string) {
+  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(`nexo:setting:${key}`, value);
+    } catch {
+      // Keep the database as the fallback when browser storage is unavailable.
+    }
+  }
   const updatedAt = nowIso();
   await db.insert(settings).values({ key, value, updatedAt }).onConflictDoUpdate({ target: settings.key, set: { value, updatedAt } }).run();
 }
@@ -70,11 +87,12 @@ export async function updateNote(id: string, input: Partial<Pick<Note, 'title' |
   await db.update(notes).set(item).where(eq(notes.id, id)).run();
   return findNote(id);
 }
-export async function appendNoteBlock(id: string, block: NoteBlock) {
+export async function appendNoteBlock(id: string, block: NoteBlock, notifyListeners = true) {
   const note = await findNote(id);
   if (!note) return undefined;
   const blocks = parseNoteBlocks(note.content);
   await updateNote(id, { content: serializeNoteBlocks([...blocks, block]) });
+  if (notifyListeners) publishNoteBlockChange(id);
   return block;
 }
 export async function archiveNote(id: string) {

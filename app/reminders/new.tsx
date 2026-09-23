@@ -1,9 +1,10 @@
+import { goBackOrHome } from '@/navigation/back';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, spacing, typography } from '@/design/theme';
+import { colors, radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import { ActionSheet, DateTimeSheet, useSnackbar } from '@/components/visual';
 import { Header, Input, PrimaryButton } from '@/components/ui';
 import { createReminder, findReminder, updateReminder } from '@/database/repositories';
@@ -22,6 +23,7 @@ function timeLabel(value: Date) {
 }
 
 export default function NewReminder() {
+  const styles = useThemeStyles(makeStyles);
   const { showSnackbar } = useSnackbar();
   const params = useLocalSearchParams<{ id?: string; seed?: string }>();
   const [title, setTitle] = useState(params.seed || '');
@@ -78,14 +80,14 @@ export default function NewReminder() {
     }
     if (!reminder) return;
     await scheduleReminder(reminder);
-    showSnackbar(existingId ? 'Lembrete atualizado' : 'Lembrete criado');
+    showSnackbar(existingId ? 'Lembrete atualizado' : 'Lembrete criado', existingId ? 'info' : 'success');
     router.replace({ pathname: '/reminders/[id]', params: { id: reminder.id } });
   };
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Header title={existingId ? 'Editar lembrete' : 'Novo lembrete'} onBack={() => router.back()} />
+        <Header title={existingId ? 'Editar lembrete' : 'Novo lembrete'} onBack={() => goBackOrHome()} />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.titleField}>
             <Input value={title} onChangeText={setTitle} placeholder="O que você quer lembrar?" autoFocus style={styles.titleInput} />
@@ -146,6 +148,8 @@ function ReminderField({
   value: string;
   onPress: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useThemeStyles(makeStyles);
   return (
     <Pressable
       accessibilityRole="button"
@@ -163,35 +167,36 @@ function ReminderField({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
-  root: { flex: 1, backgroundColor: colors.surface },
-  content: { padding: spacing.lg, paddingBottom: spacing.lg, gap: spacing.xl },
-  titleField: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-  },
-  titleInput: {
-    minHeight: 54,
-    backgroundColor: 'transparent',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  options: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  field: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-  },
-  fieldPressed: { backgroundColor: colors.surfacePressed },
-  fieldIcon: { width: 28, alignItems: 'center' },
-  fieldLabel: { ...typography.body, color: colors.ink, flex: 1 },
-  fieldValue: { ...typography.caption, color: colors.inkSoft },
-  description: { minHeight: 100, backgroundColor: colors.surfaceMuted },
-  bottom: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
-});
+const makeStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.surface },
+    root: { flex: 1, backgroundColor: colors.surface },
+    content: { padding: spacing.lg, paddingBottom: spacing.lg, gap: spacing.xl },
+    titleField: {
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.line,
+      backgroundColor: colors.surface,
+    },
+    titleInput: {
+      minHeight: 54,
+      backgroundColor: 'transparent',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    options: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+    field: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.line,
+    },
+    fieldPressed: { backgroundColor: colors.surfacePressed },
+    fieldIcon: { width: 28, alignItems: 'center' },
+    fieldLabel: { ...typography.body, color: colors.ink, flex: 1 },
+    fieldValue: { ...typography.caption, color: colors.inkSoft },
+    description: { minHeight: 100, backgroundColor: colors.surfaceMuted },
+    bottom: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  });

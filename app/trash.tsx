@@ -1,10 +1,16 @@
-import { router } from 'expo-router';
+import { goBackOrHome } from '@/navigation/back';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@/design/theme';
+import { colors, spacing, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import { EmptyState, Header, ListRow } from '@/components/ui';
 import { AppDialog } from '@/components/visual';
 import { listTrash, restoreTrashItem, type TrashEntry } from '@/database/repositories';
+import { AnimatedListItem } from '@/motion/AnimatedListItem';
+import { animateListLayout } from '@/motion/layout';
+import { useReducedMotion } from '@/motion/useReducedMotion';
+import { playUISound } from '@/services/ui-sound-service';
+import { useSnackbar } from '@/components/visual';
 
 const labels: Record<TrashEntry['type'], string> = {
   note: 'Nota',
@@ -15,31 +21,49 @@ const labels: Record<TrashEntry['type'], string> = {
 };
 
 export default function Trash() {
+  const styles = useThemeStyles(makeStyles);
   const [items, setItems] = useState<TrashEntry[]>([]);
   const [selected, setSelected] = useState<TrashEntry | null>(null);
-  const load = useCallback(async () => setItems(await listTrash()), []);
+  const [exitingId, setExitingId] = useState<string | null>(null);
+  const reducedMotion = useReducedMotion();
+  const { showSnackbar } = useSnackbar();
+  const load = useCallback(async () => {
+    const nextItems = await listTrash();
+    animateListLayout(reducedMotion);
+    setItems(nextItems);
+  }, [reducedMotion]);
   useEffect(() => {
     load();
   }, [load]);
   const restore = async () => {
     if (!selected) return;
     await restoreTrashItem(selected);
+    setExitingId(`${selected.type}-${selected.id}`);
     setSelected(null);
-    await load();
+    playUISound('undo-soft');
+    showSnackbar('Item restaurado', 'info');
   };
   return (
-    <View style={styles.root}>
-      <Header title="Lixeira" onBack={() => router.back()} />
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <Header title="Lixeira" onBack={() => goBackOrHome()} />
       <View style={styles.content}>
         {items.length ? (
-          items.map((item) => (
-            <ListRow
+          items.map((item, index) => (
+            <AnimatedListItem
               key={`${item.type}-${item.id}`}
-              icon="trash-outline"
-              title={item.title}
-              subtitle={`${labels[item.type]} · ${new Date(item.deletedAt).toLocaleDateString('pt-BR')}`}
-              onPress={() => setSelected(item)}
-            />
+              delay={reducedMotion ? 0 : index * 30}
+              exiting={exitingId === `${item.type}-${item.id}`}
+              onExitComplete={() => {
+                void load().then(() => setExitingId(null));
+              }}
+            >
+              <ListRow
+                icon="trash-outline"
+                title={item.title}
+                subtitle={`${labels[item.type]} · ${new Date(item.deletedAt).toLocaleDateString('pt-BR')}`}
+                onPress={() => setSelected(item)}
+              />
+            </AnimatedListItem>
           ))
         ) : (
           <EmptyState
@@ -57,8 +81,9 @@ export default function Trash() {
         onClose={() => setSelected(null)}
         onConfirm={restore}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: colors.canvas }, content: { flex: 1, padding: spacing.lg } });
+const makeStyles = (colors: AppColors) =>
+  StyleSheet.create({ root: { flex: 1, backgroundColor: colors.canvas }, content: { flex: 1, padding: spacing.lg } });

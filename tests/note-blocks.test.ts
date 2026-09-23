@@ -20,4 +20,9 @@ describe('note blocks', () => {
   it('keeps plain text notes readable when content is not JSON', () => {
     expect(parseNoteBlocks('Uma nota antiga')).toEqual([{ type: 'text', text: 'Uma nota antiga' }]);
   });
+
+  it('preserves formatting when a note is saved and reopened', () => {
+    const blocks = [{ type: 'text' as const, text: 'Olá mundo', marks: [{ start: 4, end: 9, styles: ['bold' as const] }] }];
+    expect(parseNoteBlocks(serializeNoteBlocks(blocks))).toEqual(blocks);
+  });
 });

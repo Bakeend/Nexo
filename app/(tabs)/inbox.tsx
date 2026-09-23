@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, typography } from '@/design/theme';
-import { AppIcon, BottomNav, CaptureSheet, EmptyState, FloatingButton } from '@/components/ui';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
+import { AppIcon, BottomNav, CaptureSheet, EmptyState } from '@/components/ui';
 import {
   createNote,
   createTask,
@@ -13,8 +13,15 @@ import {
   listInbox,
   organizeInbox,
 } from '@/database/repositories';
-import { ActionSheet, useSnackbar } from '@/components/visual';
+import { BottomSheet, useItemActions, useSnackbar } from '@/components/visual';
+import { LongPressItem } from '@/components/long-press-item';
+import { InlineAudioPlayer } from '@/components/audio-playback';
 import type { InboxItem } from '@/types/domain';
+import { shareAttachment } from '@/services/attachment-sharing';
+import { animateListLayout } from '@/motion/layout';
+import { useReducedMotion } from '@/motion/useReducedMotion';
+import { AnimatedListItem } from '@/motion/AnimatedListItem';
+import { playUISound } from '@/services/ui-sound-service';
 
 function formatInboxDate(value: string) {
   const date = new Date(value);
@@ -29,18 +36,120 @@ function formatInboxDate(value: string) {
 }
 
 export default function Inbox() {
+  const colors = useThemeColors();
+  const styles = useThemeStyles(makeStyles);
+  const { id: requestedItemId } = useLocalSearchParams<{ id?: string }>();
   const { showSnackbar } = useSnackbar();
+  const { showItemConfirmation } = useItemActions();
   const [items, setItems] = useState<InboxItem[]>([]);
-  const [selected, setSelected] = useState<{ item: InboxItem; attachmentId?: string } | null>(null);
+  const [exitingId, setExitingId] = useState<string | null>(null);
+  const afterExitRef = useRef<(() => void) | null>(null);
+  const [audioAttachmentIds, setAudioAttachmentIds] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<InboxItem | null>(null);
   const [open, setOpen] = useState(false);
-  const load = useCallback(async () => setItems(await listInbox()), []);
-  useEffect(() => {
-    load();
-  }, [load]);
-  const actions = async (item: InboxItem) => {
-    const attachments = await listAttachments(item.itemId);
-    setSelected({ item, attachmentId: attachments[0]?.id });
+  const insets = useSafeAreaInsets();
+  const openedSearchItemRef = useRef<string | null>(null);
+  const reducedMotion = useReducedMotion();
+  const exitItem = (id: string, afterExit?: () => void) => {
+    afterExitRef.current = afterExit || null;
+    setExitingId(id);
   };
+  const load = useCallback(async () => {
+    const nextItems = await listInbox();
+    animateListLayout(reducedMotion);
+    setItems(nextItems);
+    const audioEntries = await Promise.all(
+      nextItems
+        .filter((item) => item.itemType === 'audio')
+        .map(async (item) => {
+          const audio = (await listAttachments(item.itemId)).find((attachment) => attachment.type === 'audio');
+          return audio ? ([item.id, audio.id] as const) : null;
+        }),
+    );
+    setAudioAttachmentIds(Object.fromEntries(audioEntries.filter((entry): entry is readonly [string, string] => Boolean(entry))));
+  }, [reducedMotion]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+  const openItem = async (item: InboxItem) => {
+    const attachments = await listAttachments(item.itemId);
+    if (attachments[0]) router.push({ pathname: '/media/preview', params: { id: attachments[0].id } });
+    else setSelected(item);
+  };
+  useEffect(() => {
+    if (!requestedItemId) {
+      openedSearchItemRef.current = null;
+      return;
+    }
+    const item = items.find((candidate) => candidate.id === requestedItemId);
+    if (!item || openedSearchItemRef.current === item.id) return;
+    openedSearchItemRef.current = item.id;
+    setSelected(item);
+    router.setParams({ id: '' });
+  }, [items, requestedItemId]);
+  const itemActions = (item: InboxItem) => [
+    ...(item.itemType === 'file' || item.itemType === 'image' || item.itemType === 'audio'
+      ? [
+          ...(item.itemType === 'audio' ? [] : [{ label: 'Abrir anexo', icon: 'open-outline' as const, onPress: () => openItem(item) }]),
+          {
+            label: 'Compartilhar',
+            icon: 'share-outline' as const,
+            onPress: async () => {
+              const attachments = await listAttachments(item.itemId);
+              const attachment = attachments.find((candidate) => candidate.type === item.itemType);
+              if (!attachment) return;
+              try {
+                if (!(await shareAttachment(attachment))) showSnackbar('Compartilhamento indisponível neste dispositivo.', 'error');
+              } catch {
+                showSnackbar('Não foi possível compartilhar o anexo.', 'error');
+              }
+            },
+          },
+        ]
+      : []),
+    {
+      label: 'Transformar em nota',
+      description: 'Continuar editando como nota',
+      icon: 'document-text-outline' as const,
+      onPress: async () => {
+        const note = await createNote({ title: friendlyInboxTitle(item.rawText) });
+        await organizeInbox(item.id);
+        playUISound('success-tick');
+        showSnackbar('Captura transformada em nota', 'success');
+        exitItem(item.id, () => router.push({ pathname: '/notes/[id]', params: { id: note.id } }));
+      },
+    },
+    {
+      label: 'Transformar em tarefa',
+      description: 'Adicionar à sua lista',
+      icon: 'checkmark-circle-outline' as const,
+      onPress: async () => {
+        const task = await createTask({ title: friendlyInboxTitle(item.rawText) || 'Nova tarefa' });
+        await organizeInbox(item.id);
+        playUISound('success-tick');
+        showSnackbar('Captura transformada em tarefa', 'success');
+        exitItem(item.id, () => router.push({ pathname: '/tasks/[id]', params: { id: task.id } }));
+      },
+    },
+    {
+      label: 'Excluir',
+      description: 'Mover para a lixeira',
+      icon: 'trash-outline' as const,
+      destructive: true,
+      onPress: () =>
+        showItemConfirmation({
+          title: 'Excluir esta captura?',
+          confirmLabel: 'Excluir',
+          onConfirm: async () => {
+            await deleteInbox(item.id);
+            exitItem(item.id);
+            showSnackbar('Captura excluída', 'info');
+          },
+        }),
+    },
+  ];
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
@@ -49,28 +158,48 @@ export default function Inbox() {
           <Text style={styles.badgeText}>{items.length}</Text>
         </View>
       </View>
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 88 + insets.bottom }} showsVerticalScrollIndicator={false}>
         {items.length ? (
           items.map((item) => (
-            <Pressable
+            <AnimatedListItem
               key={item.id}
-              onPress={() => actions(item)}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              style={styles.rowContainer}
+              exiting={exitingId === item.id}
+              onExitComplete={() => {
+                const afterExit = afterExitRef.current;
+                afterExitRef.current = null;
+                void load().then(() => {
+                  setExitingId(null);
+                  afterExit?.();
+                });
+              }}
             >
-              <AppIcon
-                name={item.itemType === 'image' ? 'image-outline' : item.itemType === 'audio' ? 'mic-outline' : 'document-outline'}
-                color={item.itemType === 'image' ? colors.accent : colors.inkSoft}
-                background={colors.surfaceMuted}
-                size={18}
-              />
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {friendlyInboxTitle(item.rawText)}
-                </Text>
-                <Text style={styles.rowSubtitle}>{formatInboxDate(item.createdAt)}</Text>
-              </View>
-            </Pressable>
+              <LongPressItem
+                title={friendlyInboxTitle(item.rawText)}
+                actions={itemActions(item)}
+                onPress={item.itemType === 'audio' ? undefined : () => openItem(item)}
+                style={styles.row}
+                pressedStyle={styles.rowPressed}
+              >
+                <AppIcon
+                  name={item.itemType === 'image' ? 'image-outline' : item.itemType === 'audio' ? 'mic-outline' : 'document-outline'}
+                  color={item.itemType === 'image' ? colors.accent : colors.inkSoft}
+                  background={colors.surfaceMuted}
+                  size={18}
+                />
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>
+                    {friendlyInboxTitle(item.rawText)}
+                  </Text>
+                  <Text style={styles.rowSubtitle}>{formatInboxDate(item.createdAt)}</Text>
+                </View>
+              </LongPressItem>
+              {audioAttachmentIds[item.id] ? (
+                <View style={styles.audioPlayer}>
+                  <InlineAudioPlayer attachmentId={audioAttachmentIds[item.id]} />
+                </View>
+              ) : null}
+            </AnimatedListItem>
           ))
         ) : (
           <EmptyState
@@ -81,99 +210,59 @@ export default function Inbox() {
             onAction={() => setOpen(true)}
           />
         )}
-      </View>
-      <BottomNav />
-      <FloatingButton onPress={() => setOpen(true)} />
-      <CaptureSheet visible={open} onClose={() => setOpen(false)} onCreated={load} />
-      <ActionSheet
-        visible={Boolean(selected)}
-        title={selected ? friendlyInboxTitle(selected.item.rawText) : 'Captura rápida'}
-        onClose={() => setSelected(null)}
-        options={[
-          ...(selected?.attachmentId
-            ? [
-                {
-                  label: 'Abrir conteúdo',
-                  icon: 'open-outline' as const,
-                  onPress: () => router.push({ pathname: '/media/preview', params: { id: selected.attachmentId as string } }),
-                },
-              ]
-            : []),
-          {
-            label: 'Transformar em nota',
-            description: 'Continuar editando como nota',
-            icon: 'document-text-outline',
-            onPress: async () => {
-              if (!selected) return;
-              const note = await createNote({ title: friendlyInboxTitle(selected.item.rawText) });
-              await organizeInbox(selected.item.id);
-              showSnackbar('Captura transformada em nota');
-              setSelected(null);
-              router.push({ pathname: '/notes/[id]', params: { id: note.id } });
-            },
-          },
-          {
-            label: 'Transformar em tarefa',
-            description: 'Adicionar à sua lista',
-            icon: 'checkmark-circle-outline',
-            onPress: async () => {
-              if (!selected) return;
-              const task = await createTask({ title: friendlyInboxTitle(selected.item.rawText) || 'Nova tarefa' });
-              await organizeInbox(selected.item.id);
-              showSnackbar('Captura transformada em tarefa');
-              setSelected(null);
-              router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
-            },
-          },
-          {
-            label: 'Excluir',
-            description: 'Mover para a lixeira',
-            icon: 'trash-outline',
-            destructive: true,
-            onPress: async () => {
-              if (!selected) return;
-              await deleteInbox(selected.item.id);
-              setSelected(null);
-              await load();
-              showSnackbar('Captura excluída');
-            },
-          },
-        ]}
+      </ScrollView>
+      <BottomNav onCreate={() => setOpen(true)} createExpanded={open} />
+      <CaptureSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        onCreated={async () => {
+          await load();
+          playUISound('capture');
+        }}
       />
+      <BottomSheet
+        visible={Boolean(selected)}
+        title={selected ? friendlyInboxTitle(selected.rawText) : 'Captura r?pida'}
+        onClose={() => setSelected(null)}
+      >
+        <Text style={styles.captureText}>{selected?.rawText || ''}</Text>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
-  header: {
-    minHeight: 62,
-    paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: { ...typography.heading, color: colors.ink },
-  badge: {
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { ...typography.caption, color: colors.inkSoft, fontWeight: '700' },
-  content: { flex: 1, paddingHorizontal: spacing.lg, paddingBottom: 100 },
-  row: {
-    minHeight: 62,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-  },
-  rowPressed: { backgroundColor: colors.surfacePressed },
-  rowCopy: { flex: 1 },
-  rowTitle: { ...typography.bodyStrong, color: colors.ink },
-  rowSubtitle: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
-});
+const makeStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.surface },
+    header: {
+      minHeight: 62,
+      paddingHorizontal: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    title: { ...typography.heading, color: colors.ink },
+    badge: {
+      minWidth: 28,
+      height: 28,
+      borderRadius: 14,
+      paddingHorizontal: spacing.sm,
+      backgroundColor: colors.surfaceMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badgeText: { ...typography.caption, color: colors.inkSoft, fontWeight: '700' },
+    content: { flex: 1, paddingHorizontal: spacing.lg },
+    rowContainer: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+    row: {
+      minHeight: 62,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    audioPlayer: { paddingLeft: 50, paddingBottom: spacing.sm },
+    rowPressed: { backgroundColor: colors.surfacePressed },
+    captureText: { ...typography.body, color: colors.ink },
+    rowCopy: { flex: 1 },
+    rowTitle: { ...typography.bodyStrong, color: colors.ink },
+    rowSubtitle: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
+  });
