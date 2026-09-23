@@ -186,6 +186,15 @@ export async function listTasks(filter: TaskListFilter = 'all'): Promise<Task[]>
   const now = new Date();
   return (rows as Array<typeof tasks.$inferSelect>).map(toTask).filter((task) => matchesTaskDateFilter(task.dueAt, filter, now));
 }
+export async function listTasksForNote(noteId: string): Promise<Task[]> {
+  const rows = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.relatedNoteId, noteId), isNull(tasks.deletedAt), isNull(tasks.archivedAt)))
+    .orderBy(tasks.completedAt, tasks.dueAt, desc(tasks.createdAt))
+    .all();
+  return rows.map(toTask);
+}
 const toTask = (row: typeof tasks.$inferSelect): Task =>
   ({ ...row, priority: row.priority as Priority, repeatRule: ruleFromDb(row.repeatRule) }) as Task;
 export async function findTask(id: string) {
@@ -231,6 +240,7 @@ export async function updateTask(
     dueAt: string | null;
     priority: Priority;
     spaceId: string | null;
+    relatedNoteId: string | null;
     repeatRule: RepeatRule;
     pinned: boolean;
   }>,

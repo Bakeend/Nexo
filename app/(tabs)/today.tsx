@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
+import { radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import { BottomNav, CaptureSheet, EmptyState, IconButton } from '@/components/ui';
 import { completeReminder, listReminders, listTasks, toggleTask, trashReminder, trashTask, updateTask } from '@/database/repositories';
 import type { Reminder, Task } from '@/types/domain';
@@ -42,7 +42,7 @@ export default function Today() {
   const load = useCallback(async () => {
     const [t, r] = await Promise.all([listTasks('today'), listReminders()]);
     animateListLayout(reducedMotion);
-    setTasks(t.filter((x) => !x.completedAt));
+    setTasks(t.filter((x) => !x.completedAt).sort((a, b) => (a.dueAt ?? '').localeCompare(b.dueAt ?? '')));
     setReminders(r.filter((x) => !x.completedAt && new Date(x.scheduledAt).toDateString() === new Date().toDateString()));
     setLoading(false);
   }, [reducedMotion]);
@@ -258,6 +258,7 @@ export default function Today() {
   }).format(new Date());
   const formattedDate = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
   const nextTask = tasks[0];
+  const otherTasks = tasks.slice(1);
 
   const taskTimeLabel = (task: Task) => {
     if (!task.dueAt) return 'Sem horário';
@@ -290,64 +291,83 @@ export default function Today() {
         </View>
         <Text style={styles.sectionTitle}>Próximo</Text>
         {nextTask ? (
-          <LongPressItem
-            title={nextTask.title}
-            actions={taskActions(nextTask)}
-            onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: nextTask.id } })}
-            style={styles.nextRow}
-            pressedStyle={styles.rowPressed}
+          <AnimatedListItem
+            key={nextTask.id}
+            style={{ marginLeft: postponingTaskIds.has(nextTask.id) && !reducedMotion ? 16 : 0 }}
+            exiting={exitingTaskIds.has(nextTask.id)}
+            onExitComplete={() => void finishTaskExit(nextTask.id)}
           >
-            <View style={styles.nextIcon}>
-              <Ionicons name="arrow-forward" size={19} color={colors.accent} />
-            </View>
-            <View style={styles.rowCopy}>
-              <Text style={styles.nextTitle} numberOfLines={2}>
-                {nextTask.title}
-              </Text>
-              <Text style={styles.nextTime}>{taskTimeLabel(nextTask)}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
-          </LongPressItem>
+            <LongPressItem
+              title={nextTask.title}
+              actions={taskActions(nextTask)}
+              onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: nextTask.id } })}
+              style={styles.nextRow}
+              pressedStyle={styles.rowPressed}
+            >
+              <View style={styles.nextIcon}>
+                <Checkbox
+                  checked={completingTaskIds.has(nextTask.id)}
+                  label={nextTask.title}
+                  onPress={() => startTaskCompletion(nextTask, false)}
+                />
+              </View>
+              <View style={styles.rowCopy}>
+                <Text style={[styles.nextTitle, completingTaskIds.has(nextTask.id) && styles.completedTask]} numberOfLines={2}>
+                  {nextTask.title}
+                </Text>
+                <Text style={styles.nextTime}>{taskTimeLabel(nextTask)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
+            </LongPressItem>
+          </AnimatedListItem>
         ) : (
           <Text style={styles.emptyLine}>Nada agendado por enquanto.</Text>
         )}
-        <Text style={styles.sectionTitle}>Minhas tarefas</Text>
-        {loading ? (
-          <Text style={styles.muted}>Carregando…</Text>
-        ) : tasks.length ? (
-          tasks.map((task) => (
-            <AnimatedListItem
-              key={task.id}
-              style={{ marginLeft: postponingTaskIds.has(task.id) && !reducedMotion ? 16 : 0 }}
-              exiting={exitingTaskIds.has(task.id)}
-              onExitComplete={() => void finishTaskExit(task.id)}
-            >
-              <LongPressItem
-                title={task.title}
-                actions={taskActions(task)}
-                onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: task.id } })}
-                style={styles.taskRow}
-                pressedStyle={styles.rowPressed}
-              >
-                <Checkbox checked={completingTaskIds.has(task.id)} label={task.title} onPress={() => startTaskCompletion(task, false)} />
-                <View style={styles.rowCopy}>
-                  <Text style={[styles.taskTitle, completingTaskIds.has(task.id) && styles.completedTask]} numberOfLines={2}>
-                    {task.title}
-                  </Text>
-                  <Text style={styles.taskMeta}>{taskTimeLabel(task)}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
-              </LongPressItem>
-            </AnimatedListItem>
-          ))
-        ) : (
-          <EmptyState
-            icon="sunny-outline"
-            title="Dia livre"
-            description="Você não tem tarefas pendentes para hoje."
-            action="Criar tarefa"
-            onAction={() => router.push('/tasks/new')}
-          />
+        {(loading || otherTasks.length > 0 || !nextTask) && (
+          <>
+            <Text style={styles.sectionTitle}>{otherTasks.length ? 'Outras tarefas' : 'Minhas tarefas'}</Text>
+            {loading ? (
+              <Text style={styles.muted}>Carregando…</Text>
+            ) : otherTasks.length ? (
+              otherTasks.map((task) => (
+                <AnimatedListItem
+                  key={task.id}
+                  style={{ marginLeft: postponingTaskIds.has(task.id) && !reducedMotion ? 16 : 0 }}
+                  exiting={exitingTaskIds.has(task.id)}
+                  onExitComplete={() => void finishTaskExit(task.id)}
+                >
+                  <LongPressItem
+                    title={task.title}
+                    actions={taskActions(task)}
+                    onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: task.id } })}
+                    style={styles.taskRow}
+                    pressedStyle={styles.rowPressed}
+                  >
+                    <Checkbox
+                      checked={completingTaskIds.has(task.id)}
+                      label={task.title}
+                      onPress={() => startTaskCompletion(task, false)}
+                    />
+                    <View style={styles.rowCopy}>
+                      <Text style={[styles.taskTitle, completingTaskIds.has(task.id) && styles.completedTask]} numberOfLines={2}>
+                        {task.title}
+                      </Text>
+                      <Text style={styles.taskMeta}>{taskTimeLabel(task)}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
+                  </LongPressItem>
+                </AnimatedListItem>
+              ))
+            ) : (
+              <EmptyState
+                icon="sunny-outline"
+                title="Dia livre"
+                description="Você não tem tarefas pendentes para hoje."
+                action="Criar tarefa"
+                onAction={() => router.push('/tasks/new')}
+              />
+            )}
+          </>
         )}
         {reminders.length ? (
           <>
@@ -435,8 +455,8 @@ const makeStyles = (colors: AppColors) =>
       backgroundColor: colors.accentSoft,
     },
     nextIcon: {
-      width: 42,
-      height: 42,
+      width: 44,
+      height: 44,
       borderRadius: radius.md,
       alignItems: 'center',
       justifyContent: 'center',

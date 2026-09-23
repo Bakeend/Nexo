@@ -1,6 +1,5 @@
 import { goBackOrHome } from '@/navigation/back';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Animated, StyleSheet, Text, View } from 'react-native';
@@ -10,7 +9,7 @@ import { InlineAudioPlayer, useAudioPlaybackActions } from '@/components/audio-p
 import { LongPressItem } from '@/components/long-press-item';
 import { Header, Input, PrimaryButton } from '@/components/ui';
 import { findAttachment, findNote, setPinnedItem, trashAttachment, updateAttachment, updateNote } from '@/database/repositories';
-import { shareAttachment } from '@/services/attachment-sharing';
+import { openAttachmentExternally, shareAttachment } from '@/services/attachment-sharing';
 import type { Attachment } from '@/types/domain';
 import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 import { motionDuration } from '@/motion/tokens';
@@ -25,6 +24,7 @@ export default function MediaPreview() {
   const [displayUri, setDisplayUri] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [openError, setOpenError] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
@@ -194,14 +194,23 @@ export default function MediaPreview() {
             >
               <Text style={styles.title}>{attachment.originalName || 'Arquivo'}</Text>
             </LongPressItem>
-            <Text style={styles.body}>O arquivo foi copiado para o armazenamento controlado pelo Nexo.</Text>
+            <Text style={styles.body}>
+              O arquivo foi copiado para o armazenamento controlado pelo Nexo. Toque abaixo para abrir com um aplicativo compatível.
+            </Text>
             <PrimaryButton
               disabled={missing}
-              title="Abrir arquivo"
-              onPress={() => {
-                if (!displayUri) return;
-                if (Platform.OS === 'web') window.open(displayUri, '_blank');
-                else Linking.openURL(displayUri).catch(() => setOpenError(true));
+              loading={opening}
+              title="Abrir com aplicativo"
+              onPress={async () => {
+                if (!displayUri || opening) return;
+                setOpening(true);
+                try {
+                  await openAttachmentExternally(attachment, displayUri);
+                } catch {
+                  setOpenError(true);
+                } finally {
+                  setOpening(false);
+                }
               }}
             />
           </View>

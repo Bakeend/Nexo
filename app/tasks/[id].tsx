@@ -1,14 +1,14 @@
 import { goBackOrHome } from '@/navigation/back';
 import { addDays } from 'date-fns';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { Platform, Animated, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
+import { spacing, typography, useThemeStyles, type AppColors } from '@/design/theme';
 import { Header, ListRow, PrimaryButton } from '@/components/ui';
 import { LongPressItem } from '@/components/long-press-item';
 import { useItemActions, useSnackbar } from '@/components/visual';
-import { findTask, setPinnedItem, toggleTask, trashTask, updateTask } from '@/database/repositories';
+import { findNote, findTask, setPinnedItem, toggleTask, trashTask, updateTask } from '@/database/repositories';
 import type { Task } from '@/types/domain';
 import { playUISound } from '@/services/ui-sound-service';
 import { motionDuration, motionSpring } from '@/motion/tokens';
@@ -25,6 +25,7 @@ export default function TaskDetail() {
   const styles = useThemeStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [task, setTask] = useState<Task>();
+  const [relatedNoteTitle, setRelatedNoteTitle] = useState<string | null>(null);
   const [previewCompleted, setPreviewCompleted] = useState<boolean | null>(null);
   const reducedMotion = useReducedMotion();
   const offset = useRef(new Animated.Value(0)).current;
@@ -32,11 +33,17 @@ export default function TaskDetail() {
   const { showItemConfirmation } = useItemActions();
   const { showSnackbar } = useSnackbar();
   const load = useCallback(async () => {
-    if (id) setTask(await findTask(id));
+    if (!id) return;
+    const nextTask = await findTask(id);
+    setTask(nextTask);
+    const relatedNote = nextTask?.relatedNoteId ? await findNote(nextTask.relatedNoteId) : undefined;
+    setRelatedNoteTitle(relatedNote && !relatedNote.deletedAt && !relatedNote.archivedAt ? relatedNote.title || 'Nota sem título' : null);
   }, [id]);
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
   if (!task)
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -139,8 +146,10 @@ export default function TaskDetail() {
           <ListRow
             icon="document-text-outline"
             title="Nota relacionada"
-            subtitle="Abrir nota original"
-            onPress={() => router.push({ pathname: '/notes/[id]', params: { id: task.relatedNoteId as string } })}
+            subtitle={relatedNoteTitle || 'Nota indisponível'}
+            onPress={
+              relatedNoteTitle ? () => router.push({ pathname: '/notes/[id]', params: { id: task.relatedNoteId as string } }) : undefined
+            }
           />
         ) : null}
         <View style={styles.actions}>

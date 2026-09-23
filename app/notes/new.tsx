@@ -17,6 +17,8 @@ import {
   createNote,
   findAttachment,
   findNote,
+  listTasksForNote,
+  toggleTask,
   trashAttachment,
   updateNote,
 } from '@/database/repositories';
@@ -27,7 +29,7 @@ import { animateListLayout } from '@/motion/layout';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { playUISound } from '@/services/ui-sound-service';
 import { motionDuration } from '@/motion/tokens';
-import type { NoteBlock, NoteTextStyle } from '@/types/domain';
+import type { NoteBlock, NoteTextStyle, Task } from '@/types/domain';
 import { createChecklistItem, parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 import { toggleTextStyle, updateTextMarks } from '@/utils/note-formatting';
 
@@ -90,6 +92,8 @@ export default function NewNote() {
   const selection = useRef({ start: 0, end: 0 });
   const [freshBlockIndex, setFreshBlockIndex] = useState<number | null>(null);
   const [noteId, setNoteId] = useState<string | null>(params.id || null);
+  const [noteSpaceId, setNoteSpaceId] = useState<string | null>(params.spaceId || null);
+  const [linkedTasks, setLinkedTasks] = useState<Task[]>([]);
   const [status, setStatus] = useState('');
   const [attachmentSheet, setAttachmentSheet] = useState(false);
   const [formatSheet, setFormatSheet] = useState(false);
@@ -106,11 +110,13 @@ export default function NewNote() {
   const load = useCallback(async () => {
     const activeNoteId = noteId || params.id;
     if (!activeNoteId) return;
-    const note = await findNote(activeNoteId);
+    const [note, tasks] = await Promise.all([findNote(activeNoteId), listTasksForNote(activeNoteId)]);
     if (!note) return;
     setNoteId(note.id);
+    setNoteSpaceId(note.spaceId);
     setTitle(note.title || '');
     setBlocks(withEditableLineAfterContent(parseNoteBlocks(note.content)));
+    setLinkedTasks(tasks);
     setEditingBlockIndex(null);
   }, [noteId, params.id]);
 
@@ -351,6 +357,30 @@ export default function NewNote() {
     const id = await ensureNote();
     clearPendingSave();
     if (id) router.push({ pathname: '/media/audio', params: { noteId: id } });
+  };
+  const openRelatedTask = async () => {
+    try {
+      const id = await ensureNote();
+      router.push({ pathname: '/tasks/new', params: { relatedNoteId: id, spaceId: noteSpaceId || '' } });
+    } catch {
+      showSnackbar('Não foi possível salvar a nota para criar a tarefa', 'error');
+    }
+  };
+  const toggleLinkedTask = async (task: Task) => {
+    try {
+      await toggleTask(task.id, !task.completedAt);
+      if (noteId) setLinkedTasks(await listTasksForNote(noteId));
+    } catch {
+      showSnackbar('Não foi possível atualizar a tarefa', 'error');
+    }
+  };
+  const openLinkedTask = async (task: Task) => {
+    try {
+      await save();
+      router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
+    } catch {
+      showSnackbar('Não foi possível salvar a nota', 'error');
+    }
   };
   const reportAttachmentError = (error: unknown, fallback: string) => {
     const message = error instanceof Error && error.message ? error.message : fallback;
@@ -643,6 +673,32 @@ export default function NewNote() {
               );
             return null;
           })}
+          {noteId && linkedTasks.length ? (
+            <View style={styles.linkedTasks}>
+              <Text style={styles.linkedTasksTitle}>Tarefas</Text>
+              {linkedTasks.map((task) => (
+                <LongPressItem
+                  key={task.id}
+                  title={task.title}
+                  onPress={() => void openLinkedTask(task)}
+                  style={styles.linkedTaskRow}
+                  actions={[
+                    {
+                      label: 'Abrir tarefa',
+                      icon: 'open-outline',
+                      onPress: () => void openLinkedTask(task),
+                    },
+                  ]}
+                >
+                  <Checkbox checked={Boolean(task.completedAt)} label={task.title} onPress={() => toggleLinkedTask(task)} />
+                  <Text style={[styles.linkedTaskName, task.completedAt && styles.checkedText]} numberOfLines={2}>
+                    {task.title}
+                  </Text>
+                  <Text style={styles.chevron}>›</Text>
+                </LongPressItem>
+              ))}
+            </View>
+          ) : null}
         </ScrollView>
         <View style={styles.toolbar}>
           <IconButton icon="text-outline" onPress={() => setFormatSheet(true)} label="Formatação" />
@@ -651,6 +707,7 @@ export default function NewNote() {
             onPress={() => addBlock({ type: 'checklist', items: [createChecklistItem()] })}
             label="Checklist"
           />
+          <IconButton icon="checkmark-circle-outline" onPress={() => void openRelatedTask()} label="Criar tarefa nesta nota" />
           <IconButton icon="attach-outline" onPress={() => setAttachmentSheet(true)} label="Anexo" />
         </View>
         <ActionSheet
@@ -757,6 +814,19 @@ const makeStyles = (colors: AppColors) =>
     safeRoot: { flex: 1, backgroundColor: colors.surface },
     root: { flex: 1, backgroundColor: colors.surface },
     editor: { padding: spacing.lg, paddingBottom: 100, gap: spacing.sm },
+    linkedTasks: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+    linkedTasksTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.md },
+    linkedTaskRow: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceMuted,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.sm,
+    },
+    linkedTaskName: { ...typography.bodyStrong, color: colors.ink, flex: 1 },
     titleInput: {
       backgroundColor: 'transparent',
       paddingHorizontal: 0,

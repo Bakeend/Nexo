@@ -19,7 +19,7 @@ import {
   updateNote,
   updateTask,
 } from '@/database/repositories';
-import { colors, radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
+import { radius, spacing, typography, useThemeColors, useThemeStyles, type AppColors } from '@/design/theme';
 import type { Attachment, Note, Space, Task } from '@/types/domain';
 import { motionDuration } from '@/motion/tokens';
 import { useReducedMotion } from '@/motion/useReducedMotion';
@@ -287,7 +287,6 @@ export default function SpaceDetail() {
               <View
                 style={[
                   styles.rowIcon,
-                  row.kind === 'task' && styles.taskIcon,
                   row.kind === 'task' && row.source.completedAt && styles.completedIcon,
                 ]}
               >
@@ -395,7 +394,6 @@ const makeStyles = (colors: AppColors) =>
       justifyContent: 'center',
       backgroundColor: colors.accentSoft,
     },
-    taskIcon: { backgroundColor: colors.accentSoft },
     completedIcon: { backgroundColor: colors.successSoft },
     rowCopy: { flex: 1, minWidth: 0, justifyContent: 'center' },
     rowTitle: { ...typography.bodyStrong, color: colors.ink },
