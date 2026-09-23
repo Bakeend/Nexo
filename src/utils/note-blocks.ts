@@ -50,3 +50,15 @@ export function parseNoteBlocks(content: string): NoteBlock[] {
 export function serializeNoteBlocks(blocks: NoteBlock[]) {
   return JSON.stringify(blocks);
 }
+
+export function noteBlocksToPlainText(blocks: NoteBlock[]) {
+  return blocks
+    .flatMap((block) => {
+      if (block.type === 'checklist') return block.items.map((item) => item.text.trim()).filter(Boolean);
+      if (block.type === 'link') return [[block.text.trim(), block.url.trim()].filter(Boolean).join(' ')];
+      if ('text' in block) return [block.text.trim()];
+      return block.label ? [block.label.trim()] : [];
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}

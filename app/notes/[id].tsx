@@ -33,7 +33,7 @@ export default function NoteDetail() {
   const styles = useThemeStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [note, setNote] = useState<Note>();
-  const [linkedTasks, setLinkedTasks] = useState<Task[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<Task[] | null>(null);
   const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
   const [taskMenuOpen, setTaskMenuOpen] = useState(false);
   const [taskPickerOpen, setTaskPickerOpen] = useState(false);
@@ -53,7 +53,8 @@ export default function NoteDetail() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      setLinkedTasks(null);
+      void load();
     }, [load]),
   );
 
@@ -87,6 +88,11 @@ export default function NoteDetail() {
     router.push({
       pathname: '/tasks/new',
       params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '' },
+    });
+  const convertNoteToTask = () =>
+    router.push({
+      pathname: '/tasks/new',
+      params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '', convertFromNote: '1' },
     });
   const openTaskPicker = async () => {
     try {
@@ -209,10 +215,10 @@ export default function NoteDetail() {
           actions={[
             { label: 'Editar', icon: 'create-outline', onPress: openEditor },
             {
-              label: 'Criar tarefa vinculada',
-              description: 'Usar esta nota como contexto da tarefa',
+              label: 'Transformar em tarefa',
+              description: 'Criar uma tarefa com o conteúdo desta nota',
               icon: 'checkmark-circle-outline',
-              onPress: createRelatedTask,
+              onPress: convertNoteToTask,
             },
             {
               label: 'Tags',
@@ -265,6 +271,23 @@ export default function NoteDetail() {
           <Text style={styles.title}>{note.title || 'Nota sem título'}</Text>
         </LongPressItem>
         <Text style={styles.meta}>Atualizada em {new Date(note.updatedAt).toLocaleString('pt-BR')}</Text>
+        {linkedTasks?.length === 0 ? (
+          <View style={styles.convertActions}>
+            <Pressable
+              onPress={convertNoteToTask}
+              accessibilityRole="button"
+              accessibilityLabel="Transformar nota em tarefa"
+              style={styles.convertButton}
+            >
+              <AppIcon name="checkmark-circle-outline" size={20} />
+              <Text style={styles.convertText}>Transformar em tarefa</Text>
+              <AppIcon name="chevron-forward" size={16} />
+            </Pressable>
+            <Pressable onPress={() => void openTaskPicker()} accessibilityRole="button" style={styles.linkExistingButton}>
+              <Text style={styles.linkExistingText}>Vincular tarefa existente</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {blocks.map((block, index) => {
           if (block.type === 'checklist')
             return (
@@ -385,21 +408,21 @@ export default function NoteDetail() {
             );
           return null;
         })}
-        <View style={styles.tasksSection}>
-          <View style={styles.tasksHeading}>
-            <Text style={styles.tasksTitle}>Tarefas</Text>
-            <Pressable
-              onPress={() => setTaskMenuOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Adicionar tarefa à nota"
-              style={styles.addTask}
-            >
-              <AppIcon name="add-outline" size={18} />
-              <Text style={styles.addTaskText}>Adicionar</Text>
-            </Pressable>
-          </View>
-          {linkedTasks.length ? (
-            linkedTasks.map((task) => (
+        {linkedTasks?.length ? (
+          <View style={styles.tasksSection}>
+            <View style={styles.tasksHeading}>
+              <Text style={styles.tasksTitle}>Tarefas</Text>
+              <Pressable
+                onPress={() => setTaskMenuOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Adicionar tarefa à nota"
+                style={styles.addTask}
+              >
+                <AppIcon name="add-outline" size={18} />
+                <Text style={styles.addTaskText}>Adicionar</Text>
+              </Pressable>
+            </View>
+            {linkedTasks.map((task) => (
               <LongPressItem
                 key={task.id}
                 title={task.title}
@@ -423,11 +446,9 @@ export default function NoteDetail() {
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </LongPressItem>
-            ))
-          ) : (
-            <Text style={styles.noTasks}>Nenhuma tarefa vinculada.</Text>
-          )}
-        </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
       <ActionSheet
         visible={taskMenuOpen}
@@ -475,6 +496,21 @@ const makeStyles = (colors: AppColors) =>
     titleActionTarget: { borderRadius: radius.md, marginHorizontal: -spacing.xs, paddingHorizontal: spacing.xs },
     title: { ...typography.title, color: colors.ink },
     meta: { ...typography.caption, color: colors.inkMuted, marginTop: 6, marginBottom: spacing.xl },
+    convertActions: { marginBottom: spacing.xl },
+    convertButton: {
+      minHeight: 52,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.line,
+      backgroundColor: colors.surfaceMuted,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+    },
+    convertText: { ...typography.bodyStrong, color: colors.ink, flex: 1 },
+    linkExistingButton: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.md },
+    linkExistingText: { ...typography.caption, color: colors.accent, fontWeight: '700' },
     body: { ...typography.body, color: colors.ink, lineHeight: 25, marginBottom: spacing.md, flex: 1 },
     heading: { ...typography.heading, color: colors.ink, marginVertical: spacing.md },
     checked: { textDecorationLine: 'line-through', color: colors.inkMuted },

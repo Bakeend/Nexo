@@ -6,8 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing, typography, useThemeStyles, type AppColors } from '@/design/theme';
 import { Header, Input, PrimaryButton, Segmented } from '@/components/ui';
 import { BottomSheet, DateTimeSheet, useSnackbar } from '@/components/visual';
-import { createTask, findTask, listNotes, updateTask } from '@/database/repositories';
+import { createTask, findNote, findTask, listNotes, updateTask } from '@/database/repositories';
 import type { Note, Priority } from '@/types/domain';
+import { noteBlocksToPlainText, parseNoteBlocks } from '@/utils/note-blocks';
 
 const priorityValues: Priority[] = ['none', 'low', 'medium', 'high'];
 const priorityLabels: Record<Priority, string> = {
@@ -20,9 +21,12 @@ const priorityLabels: Record<Priority, string> = {
 export default function NewTask() {
   const styles = useThemeStyles(makeStyles);
   const { showSnackbar } = useSnackbar();
-  const params = useLocalSearchParams<{ id?: string; seed?: string; relatedNoteId?: string; spaceId?: string }>();
+  const params = useLocalSearchParams<{ id?: string; seed?: string; relatedNoteId?: string; spaceId?: string; convertFromNote?: string }>();
+  const creatingFromNote = Boolean(params.relatedNoteId && !params.id);
+  const convertingFromNote = creatingFromNote && params.convertFromNote === '1';
   const [title, setTitle] = useState(params.seed || '');
   const [description, setDescription] = useState('');
+  const [sourceStatus, setSourceStatus] = useState<'loading' | 'ready' | 'error'>(convertingFromNote ? 'loading' : 'ready');
   const [priority, setPriority] = useState<Priority>('none');
   const [date, setDate] = useState<Date | null>(null);
   const [showDate, setShowDate] = useState(false);
@@ -35,10 +39,37 @@ export default function NewTask() {
     if (!params.id) setRelatedNoteId(params.relatedNoteId || null);
   }, [params.id, params.relatedNoteId]);
   useEffect(() => {
+    if (!convertingFromNote || !params.relatedNoteId) return;
+    let active = true;
+    findNote(params.relatedNoteId)
+      .then((note) => {
+        if (!active) return;
+        if (!note || note.deletedAt || note.archivedAt) {
+          setSourceStatus('error');
+          showSnackbar('Nota indisponível', 'error');
+          return;
+        }
+        setTitle(note.title || 'Nova tarefa');
+        setDescription(noteBlocksToPlainText(parseNoteBlocks(note.content)));
+        setSourceStatus('ready');
+      })
+      .catch(() => {
+        if (active) {
+          setSourceStatus('error');
+          showSnackbar('Não foi possível carregar a nota', 'error');
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [convertingFromNote, params.relatedNoteId, showSnackbar]);
+  useEffect(() => {
     listNotes()
       .then(setNotes)
-      .catch(() => showSnackbar('Não foi possível carregar as notas', 'error'));
-  }, [showSnackbar]);
+      .catch(() => {
+        if (!creatingFromNote) showSnackbar('Não foi possível carregar as notas', 'error');
+      });
+  }, [creatingFromNote, showSnackbar]);
   useEffect(() => {
     if (!params.id) return;
     findTask(params.id).then((task) => {
@@ -56,7 +87,7 @@ export default function NewTask() {
     (note.title || 'Nota sem título').toLocaleLowerCase('pt-BR').includes(noteQuery.trim().toLocaleLowerCase('pt-BR')),
   );
   const save = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || sourceStatus !== 'ready') return;
     const task = existingId
       ? await updateTask(existingId, { title, description, priority, dueAt: date?.toISOString() || null, relatedNoteId })
       : await createTask({
@@ -77,7 +108,10 @@ export default function NewTask() {
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Header title={existingId ? 'Editar tarefa' : 'Nova tarefa'} onBack={() => goBackOrHome()} />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Input value={title} onChangeText={setTitle} placeholder="O que precisa ser feito?" autoFocus />
+          <Input value={title} onChangeText={setTitle} placeholder="O que precisa ser feito?" autoFocus={!convertingFromNote} />
+          {convertingFromNote && sourceStatus !== 'ready' ? (
+            <Text style={styles.sourceStatus}>{sourceStatus === 'loading' ? 'Carregando conteúdo da nota...' : 'Nota indisponível.'}</Text>
+          ) : null}
           <Text style={styles.label}>Prioridade</Text>
           <Segmented
             values={priorityValues.map((value) => priorityLabels[value])}
@@ -93,24 +127,32 @@ export default function NewTask() {
             <Text style={styles.chevron}>›</Text>
           </Pressable>
           <DateTimeSheet visible={showDate} value={date || new Date()} onClose={() => setShowDate(false)} onConfirm={setDate} />
-          <Text style={styles.label}>Nota vinculada</Text>
-          <Pressable
-            style={styles.field}
-            onPress={() => setShowNotes(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Escolher nota vinculada"
-          >
-            <Text style={styles.fieldLabel} numberOfLines={1}>
-              {selectedNote ? selectedNote.title || 'Nota sem título' : relatedNoteId ? 'Nota indisponível' : 'Nenhuma nota'}
-            </Text>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          {!creatingFromNote ? (
+            <>
+              <Text style={styles.label}>Nota vinculada</Text>
+              <Pressable
+                style={styles.field}
+                onPress={() => setShowNotes(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Escolher nota vinculada"
+              >
+                <Text style={styles.fieldLabel} numberOfLines={1}>
+                  {selectedNote ? selectedNote.title || 'Nota sem título' : relatedNoteId ? 'Nota indisponível' : 'Nenhuma nota'}
+                </Text>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+            </>
+          ) : null}
           <Input value={description} onChangeText={setDescription} placeholder="Descrição opcional" multiline />
           <View style={styles.bottom}>
-            <PrimaryButton title={existingId ? 'Salvar tarefa' : 'Criar tarefa'} onPress={save} disabled={!title.trim()} />
+            <PrimaryButton
+              title={existingId ? 'Salvar tarefa' : 'Criar tarefa'}
+              onPress={save}
+              disabled={!title.trim() || sourceStatus !== 'ready'}
+            />
           </View>
         </ScrollView>
-        <BottomSheet visible={showNotes} title="Vincular nota" onClose={() => setShowNotes(false)}>
+        <BottomSheet visible={!creatingFromNote && showNotes} title="Vincular nota" onClose={() => setShowNotes(false)}>
           <Input value={noteQuery} onChangeText={setNoteQuery} placeholder="Buscar nota" />
           <Pressable
             style={styles.noteOption}
@@ -150,6 +192,7 @@ const makeStyles = (colors: AppColors) =>
     root: { flex: 1, backgroundColor: colors.surface },
     content: { flexGrow: 1, padding: spacing.lg, gap: spacing.md },
     label: { ...typography.caption, color: colors.inkMuted, textTransform: 'uppercase', fontWeight: '700', marginTop: spacing.md },
+    sourceStatus: { ...typography.caption, color: colors.inkMuted },
     field: {
       minHeight: 52,
       borderBottomWidth: StyleSheet.hairlineWidth,

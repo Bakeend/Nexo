@@ -1,5 +1,3 @@
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Linking from 'expo-linking';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { resolveMediaUri } from '@/services/media-service';
@@ -44,19 +42,6 @@ export async function openAttachmentExternally(attachment: Attachment, resolvedU
     const openedWindow = window.open(uri, '_blank', 'noopener,noreferrer');
     if (!openedWindow) throw new Error('O navegador bloqueou a abertura do arquivo.');
     return;
-  }
-
-  let externalUri = uri;
-  if (Platform.OS === 'android' && uri.startsWith('file://')) {
-    externalUri = await FileSystem.getContentUriAsync(uri);
-  }
-
-  try {
-    await Linking.openURL(externalUri);
-    return;
-  } catch {
-    // Alguns sistemas não registram arquivos locais no Linking. A folha nativa
-    // de compartilhamento ainda consegue entregá-los a um app compatível.
   }
 
   if (!(await Sharing.isAvailableAsync())) throw new Error('Nenhum aplicativo compatível está disponível.');
