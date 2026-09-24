@@ -81,6 +81,11 @@ export async function cancelReminder(reminder: Reminder) {
   await updateReminder(reminder.id, { notificationId: null, notificationStatus: 'cancelled', enabled: false });
 }
 
+export async function cancelAllScheduledReminders() {
+  const Notifications = await getNotifications();
+  if (Notifications) await Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
+}
+
 export async function snoozeReminder(reminder: Reminder, until: Date) {
   const next = { ...reminder, snoozedUntil: until.toISOString(), enabled: true };
   await updateReminder(reminder.id, { snoozedUntil: next.snoozedUntil });

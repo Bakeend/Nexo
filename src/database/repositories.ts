@@ -58,6 +58,33 @@ export async function setSetting(key: string, value: string) {
   await db.insert(settings).values({ key, value, updatedAt }).onConflictDoUpdate({ target: settings.key, set: { value, updatedAt } }).run();
 }
 
+export async function deleteAllUserData() {
+  if (Platform.OS === 'web') {
+    await db.transaction(async (transaction) => {
+      await transaction.delete(itemTags).run();
+      await transaction.delete(attachments).run();
+      await transaction.delete(inboxItems).run();
+      await transaction.delete(reminders).run();
+      await transaction.delete(tasks).run();
+      await transaction.delete(notes).run();
+      await transaction.delete(spaces).run();
+      await transaction.delete(tags).run();
+    });
+    return;
+  }
+
+  db.transaction((transaction) => {
+    transaction.delete(itemTags).run();
+    transaction.delete(attachments).run();
+    transaction.delete(inboxItems).run();
+    transaction.delete(reminders).run();
+    transaction.delete(tasks).run();
+    transaction.delete(notes).run();
+    transaction.delete(spaces).run();
+    transaction.delete(tags).run();
+  });
+}
+
 export async function listNotes(): Promise<Note[]> {
   return (await db
     .select()

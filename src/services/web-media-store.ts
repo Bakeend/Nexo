@@ -54,6 +54,24 @@ export async function deleteWebMedia(uri: string): Promise<void> {
   }
 }
 
+export async function clearWebMedia(): Promise<void> {
+  objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+  objectUrls.clear();
+
+  const database = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(storeName, 'readwrite');
+      transaction.objectStore(storeName).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('NÃ£o foi possÃ­vel limpar os anexos temporÃ¡rios.'));
+      transaction.onabort = () => reject(transaction.error || new Error('NÃ£o foi possÃ­vel limpar os anexos temporÃ¡rios.'));
+    });
+  } finally {
+    database.close();
+  }
+}
+
 export async function getWebMedia(uri: string): Promise<Blob | null> {
   if (!isWebMediaUri(uri)) return null;
   const database = await openDatabase();

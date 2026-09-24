@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
-import { deleteWebMedia, getWebMedia, isWebMediaUri, saveWebMedia, webMediaObjectUrl } from '@/services/web-media-store';
+import { clearWebMedia, deleteWebMedia, getWebMedia, isWebMediaUri, saveWebMedia, webMediaObjectUrl } from '@/services/web-media-store';
 
 const mediaDir = `${FileSystem.documentDirectory}media/`;
 const maxMediaBytes = 50 * 1024 * 1024;
@@ -102,6 +102,15 @@ export async function removeRestoredMedia(uri: string) {
     return;
   }
   await FileSystem.deleteAsync(uri, { idempotent: true });
+}
+
+export async function clearStoredMedia() {
+  if (Platform.OS === 'web') {
+    await clearWebMedia();
+    return;
+  }
+  if (!FileSystem.documentDirectory) return;
+  await FileSystem.deleteAsync(mediaDir, { idempotent: true });
 }
 
 export async function ensureMediaDirectory() {

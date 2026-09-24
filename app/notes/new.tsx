@@ -811,7 +811,7 @@ export default function NewNote() {
 
 const makeStyles = (colors: AppColors) =>
   StyleSheet.create({
-    safeRoot: { flex: 1, backgroundColor: colors.surface },
+    safeRoot: { flex: 1, backgroundColor: colors.canvas },
     root: { flex: 1, backgroundColor: colors.surface },
     editor: { padding: spacing.lg, paddingBottom: 100, gap: spacing.sm },
     linkedTasks: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },

@@ -1,6 +1,7 @@
 import { goBackOrHome } from '@/navigation/back';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, resolveThemeColors, spacing, typography } from '@/design/theme';
@@ -14,8 +15,9 @@ import {
   stopTypingSound,
   stopUISounds,
 } from '@/services/ui-sound-service';
-import { useSnackbar } from '@/components/visual';
+import { AppDialog, useSnackbar } from '@/components/visual';
 import { AnimatedPressable } from '@/motion/AnimatedPressable';
+import { deleteAllUserData } from '@/services/data-reset-service';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -34,6 +36,8 @@ export default function Settings() {
   const typingSoundEnabled = useUIStore((state) => state.typingSoundEnabled);
   const setTypingSoundEnabled = useUIStore((state) => state.setTypingSoundEnabled);
   const { showSnackbar } = useSnackbar();
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const toggleUISounds = (enabled: boolean) => {
     setUISoundsEnabled(enabled);
     void setSetting('ui_sounds_enabled', String(enabled));
@@ -62,7 +66,22 @@ export default function Settings() {
     { label: 'Exportar dados', icon: 'download-outline', onPress: () => router.push('/settings/backup') },
     { label: 'Ajuda e suporte', icon: 'help-circle-outline' },
     { label: 'Sair', icon: 'log-out-outline', destructive: true },
+    { label: 'Excluir todos os dados', icon: 'trash-outline', destructive: true, onPress: () => setDeleteDialogVisible(true) },
   ];
+
+  const confirmDeleteAll = async () => {
+    if (deleting) return;
+    setDeleteDialogVisible(false);
+    setDeleting(true);
+    try {
+      await deleteAllUserData();
+      showSnackbar('Todos os dados foram excluídos', 'success');
+    } catch {
+      showSnackbar('Não foi possível excluir todos os dados', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: palette.surface }]}>
@@ -116,13 +135,14 @@ export default function Settings() {
           return (
             <AnimatedPressable
               key={item.label}
-              onPress={item.onPress}
+              onPress={deleting ? undefined : item.onPress}
               accessibilityRole="button"
               accessibilityLabel={item.label}
               style={({ pressed }) => [
                 styles.row,
                 { borderBottomColor: palette.line },
-                pressed && item.onPress && { backgroundColor: palette.surfacePressed },
+                pressed && item.onPress && !deleting && { backgroundColor: palette.surfacePressed },
+                deleting && item.label === 'Excluir todos os dados' && styles.disabledRow,
               ]}
               pressedScale={0.995}
             >
@@ -134,6 +154,15 @@ export default function Settings() {
           );
         })}
       </ScrollView>
+      <AppDialog
+        visible={deleteDialogVisible}
+        title="Excluir todos os dados?"
+        message="Notas, tarefas, lembretes, espaços, tags, anexos, itens da lixeira e backups locais serão excluídos permanentemente. As preferências de aparência e som serão mantidas. Essa ação não pode ser desfeita."
+        confirmLabel="Excluir tudo"
+        destructive
+        onClose={() => setDeleteDialogVisible(false)}
+        onConfirm={() => void confirmDeleteAll()}
+      />
     </SafeAreaView>
   );
 }
@@ -177,4 +206,5 @@ const styles = StyleSheet.create({
   typingRow: { minHeight: 64 },
   rowDescription: { ...typography.caption, marginTop: 2 },
   destructiveText: { color: colors.danger },
+  disabledRow: { opacity: 0.5 },
 });
