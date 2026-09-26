@@ -14,6 +14,7 @@ import { useUIStore } from '@/stores/ui.store';
 import { preloadTypingSound, preloadUISounds } from '@/services/ui-sound-service';
 import { StatusBar } from 'expo-status-bar';
 import { resolveThemeColors } from '@/design/theme';
+import { IncomingShareHandler } from '@/components/incoming-share-handler';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -67,6 +68,7 @@ export default function RootLayout() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <AudioPlaybackProvider>
         <SnackbarProvider>
+          <IncomingShareHandler />
           <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />

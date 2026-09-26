@@ -101,6 +101,7 @@ export default function NewTask() {
     if (!task) return;
     showSnackbar(existingId ? 'Tarefa atualizada' : 'Tarefa criada', existingId ? 'info' : 'success');
     if (existingId) router.replace({ pathname: '/tasks/[id]', params: { id: task.id } });
+    else if (creatingFromNote) router.replace('/tasks');
     else goBackOrHome();
   };
   return (

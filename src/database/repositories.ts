@@ -502,6 +502,56 @@ export async function createAttachment(input: {
   return item as Attachment;
 }
 
+export async function createInboxAttachmentCapture(input: {
+  rawText: string;
+  itemType: 'file' | 'image' | 'audio';
+  type: Attachment['type'];
+  localPath: string;
+  originalName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+}) {
+  const now = nowIso();
+  const inboxItem = {
+    id: newId(),
+    itemId: newId(),
+    itemType: input.itemType,
+    rawText: input.rawText.trim(),
+    createdAt: now,
+    organizedAt: null,
+    deletedAt: null,
+  };
+  const attachment = {
+    id: newId(),
+    itemId: inboxItem.itemId,
+    itemType: input.itemType,
+    type: input.type,
+    originalName: input.originalName ?? null,
+    localPath: input.localPath,
+    mimeType: input.mimeType ?? null,
+    sizeBytes: input.sizeBytes ?? null,
+    thumbnailPath: null,
+    durationMs: null,
+    pinned: false,
+    createdAt: now,
+    deletedAt: null,
+  };
+
+  if (Platform.OS === 'web') {
+    await db.transaction(async (transaction) => {
+      await transaction.insert(inboxItems).values(inboxItem).run();
+      await transaction.insert(attachments).values(attachment).run();
+    });
+  } else {
+    db.transaction((transaction) => {
+      transaction.insert(inboxItems).values(inboxItem).run();
+      transaction.insert(attachments).values(attachment).run();
+    });
+  }
+
+  return { item: inboxItem as InboxItem, attachment: attachment as Attachment };
+}
+
 export async function listAttachments(itemId: string): Promise<Attachment[]> {
   return (await db
     .select()

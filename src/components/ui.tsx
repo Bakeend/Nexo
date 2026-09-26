@@ -774,6 +774,7 @@ const makeStyles = (colors: AppColors) =>
       paddingHorizontal: spacing.md,
       paddingVertical: 13,
       color: colors.ink,
+      outlineStyle: 'none' as unknown as 'solid',
       ...typography.body,
     },
     multiline: { minHeight: 140, textAlignVertical: 'top' },

@@ -13,6 +13,7 @@ Aplicativo pessoal para capturar, organizar e lembrar do que importa. O Nexo é 
 - **Consultar Hoje e Calendário:** ver tarefas e lembretes por data. Tarefas cujo horário já passou entram em **Atrasadas**.
 - **Pesquisar:** buscar notas, tarefas, lembretes e capturas da Caixa de entrada, incluindo Espaços e tags associados.
 - **Anexar mídia:** guardar imagens, documentos e áudio localmente.
+- **Compartilhar para o Nexo no Android:** enviar texto, URLs, fotos e PDFs pelo menu do sistema; cada conteúdo chega inicialmente à Caixa de entrada.
 - **Fazer backup:** exportar ou restaurar os dados e os arquivos anexados em um arquivo `.nexo-backup`. A restauração substitui os dados atuais após confirmação.
 
 ## Armazenamento
@@ -61,6 +62,8 @@ npm run doctor
 ```
 
 `npm run build:android` executa `expo export --platform android` para exportar os arquivos do app; não gera um APK instalável. Os perfis de build EAS estão definidos em `eas.json`: `development`, `preview` e `production`.
+
+O recebimento pelo menu Compartilhar usa filtros nativos do Android. Depois de alterar essa configuração, é necessário gerar um novo build de desenvolvimento ou preview para o Nexo aparecer como destino de compartilhamento.
 
 Os fluxos móveis de regressão ficam em `.maestro/` e usam o package Android `com.bakeend.nexo`:
 

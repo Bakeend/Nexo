@@ -19,7 +19,16 @@
       ],
       "expo-sqlite",
       "expo-audio",
-      "expo-sharing",
+      [
+        "expo-sharing",
+        {
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": ["text/*", "image/*", "application/*"],
+            "multipleShareMimeTypes": ["*/*"]
+          }
+        }
+      ],
       "expo-notifications",
       "expo-image-picker",
       "expo-font",

@@ -5,26 +5,14 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { radius, spacing, typography, useThemeStyles, type AppColors } from '@/design/theme';
-import { ActionSheet, BottomSheet, Checkbox, useItemActions, useSnackbar } from '@/components/visual';
+import { BottomSheet, Checkbox, useItemActions, useSnackbar } from '@/components/visual';
 import { InlineAudioPlayer, useAudioPlaybackActions } from '@/components/audio-playback';
 import { AttachmentImagePreview } from '@/components/attachment-image-preview';
 import { FormattedNoteText } from '@/components/formatted-note-text';
 import { LongPressItem } from '@/components/long-press-item';
 import { AppIcon, Header, Input, PrimaryButton } from '@/components/ui';
-import {
-  archiveNote,
-  findAttachment,
-  findNote,
-  listTasks,
-  listTasksForNote,
-  toggleTask,
-  trashAttachment,
-  trashNote,
-  updateAttachment,
-  updateNote,
-  updateTask,
-} from '@/database/repositories';
-import type { Attachment, Note, NoteBlock, Task } from '@/types/domain';
+import { archiveNote, findAttachment, findNote, trashAttachment, trashNote, updateAttachment, updateNote } from '@/database/repositories';
+import type { Attachment, Note, NoteBlock } from '@/types/domain';
 import { parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 import { shareAttachment } from '@/services/attachment-sharing';
 import { subscribeToNoteBlockChanges } from '@/services/note-block-events';
@@ -33,11 +21,6 @@ export default function NoteDetail() {
   const styles = useThemeStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [note, setNote] = useState<Note>();
-  const [linkedTasks, setLinkedTasks] = useState<Task[] | null>(null);
-  const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
-  const [taskMenuOpen, setTaskMenuOpen] = useState(false);
-  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
-  const [taskQuery, setTaskQuery] = useState('');
   const [attachmentRename, setAttachmentRename] = useState<Attachment>();
   const [renameValue, setRenameValue] = useState('');
   const { showSnackbar } = useSnackbar();
@@ -46,14 +29,12 @@ export default function NoteDetail() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [nextNote, tasks] = await Promise.all([findNote(id), listTasksForNote(id)]);
+    const nextNote = await findNote(id);
     setNote(nextNote);
-    setLinkedTasks(tasks);
   }, [id]);
 
   useFocusEffect(
     useCallback(() => {
-      setLinkedTasks(null);
       void load();
     }, [load]),
   );
@@ -75,62 +56,17 @@ export default function NoteDetail() {
     );
 
   const blocks = parseNoteBlocks(note.content);
-  const matchingTasks = availableTasks.filter((task) =>
-    task.title.toLocaleLowerCase('pt-BR').includes(taskQuery.trim().toLocaleLowerCase('pt-BR')),
-  );
   const updateBlocks = async (next: NoteBlock[]) => {
     const content = serializeNoteBlocks(next);
     await updateNote(note.id, { content });
     setNote((current) => current && { ...current, content, updatedAt: new Date().toISOString() });
   };
   const openEditor = () => router.push({ pathname: '/notes/new', params: { id: note.id } });
-  const createRelatedTask = () =>
-    router.push({
-      pathname: '/tasks/new',
-      params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '' },
-    });
   const convertNoteToTask = () =>
     router.push({
       pathname: '/tasks/new',
       params: { seed: note.title || 'Nova tarefa', relatedNoteId: note.id, spaceId: note.spaceId || '', convertFromNote: '1' },
     });
-  const openTaskPicker = async () => {
-    try {
-      const tasks = await listTasks('all');
-      setAvailableTasks(tasks.filter((task) => !task.relatedNoteId));
-      setTaskQuery('');
-      setTaskPickerOpen(true);
-    } catch {
-      showSnackbar('Não foi possível carregar as tarefas', 'error');
-    }
-  };
-  const linkTask = async (task: Task) => {
-    try {
-      await updateTask(task.id, { relatedNoteId: note.id });
-      setTaskPickerOpen(false);
-      await load();
-      showSnackbar('Tarefa vinculada à nota', 'success');
-    } catch {
-      showSnackbar('Não foi possível vincular a tarefa', 'error');
-    }
-  };
-  const toggleLinkedTask = async (task: Task) => {
-    try {
-      await toggleTask(task.id, !task.completedAt);
-      await load();
-    } catch {
-      showSnackbar('Não foi possível atualizar a tarefa', 'error');
-    }
-  };
-  const unlinkTask = async (task: Task) => {
-    try {
-      await updateTask(task.id, { relatedNoteId: null });
-      await load();
-      showSnackbar('Tarefa desvinculada da nota', 'info');
-    } catch {
-      showSnackbar('Não foi possível desvincular a tarefa', 'error');
-    }
-  };
   const deleteNote = async () => {
     await trashNote(note.id);
     showSnackbar('Nota enviada para a lixeira', 'info');
@@ -271,23 +207,6 @@ export default function NoteDetail() {
           <Text style={styles.title}>{note.title || 'Nota sem título'}</Text>
         </LongPressItem>
         <Text style={styles.meta}>Atualizada em {new Date(note.updatedAt).toLocaleString('pt-BR')}</Text>
-        {linkedTasks?.length === 0 ? (
-          <View style={styles.convertActions}>
-            <Pressable
-              onPress={convertNoteToTask}
-              accessibilityRole="button"
-              accessibilityLabel="Transformar nota em tarefa"
-              style={styles.convertButton}
-            >
-              <AppIcon name="checkmark-circle-outline" size={20} />
-              <Text style={styles.convertText}>Transformar em tarefa</Text>
-              <AppIcon name="chevron-forward" size={16} />
-            </Pressable>
-            <Pressable onPress={() => void openTaskPicker()} accessibilityRole="button" style={styles.linkExistingButton}>
-              <Text style={styles.linkExistingText}>Vincular tarefa existente</Text>
-            </Pressable>
-          </View>
-        ) : null}
         {blocks.map((block, index) => {
           if (block.type === 'checklist')
             return (
@@ -408,77 +327,7 @@ export default function NoteDetail() {
             );
           return null;
         })}
-        {linkedTasks?.length ? (
-          <View style={styles.tasksSection}>
-            <View style={styles.tasksHeading}>
-              <Text style={styles.tasksTitle}>Tarefas</Text>
-              <Pressable
-                onPress={() => setTaskMenuOpen(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Adicionar tarefa à nota"
-                style={styles.addTask}
-              >
-                <AppIcon name="add-outline" size={18} />
-                <Text style={styles.addTaskText}>Adicionar</Text>
-              </Pressable>
-            </View>
-            {linkedTasks.map((task) => (
-              <LongPressItem
-                key={task.id}
-                title={task.title}
-                onPress={() => router.push({ pathname: '/tasks/[id]', params: { id: task.id } })}
-                style={styles.taskRow}
-                actions={[
-                  {
-                    label: 'Abrir tarefa',
-                    icon: 'open-outline',
-                    onPress: () => router.push({ pathname: '/tasks/[id]', params: { id: task.id } }),
-                  },
-                  { label: 'Desvincular da nota', icon: 'unlink-outline', onPress: () => unlinkTask(task) },
-                ]}
-              >
-                <Checkbox checked={Boolean(task.completedAt)} label={task.title} onPress={() => toggleLinkedTask(task)} />
-                <View style={styles.taskCopy}>
-                  <Text style={[styles.taskName, task.completedAt && styles.taskCompleted]} numberOfLines={2}>
-                    {task.title}
-                  </Text>
-                  <Text style={styles.taskMeta}>{task.dueAt ? new Date(task.dueAt).toLocaleDateString('pt-BR') : 'Sem prazo'}</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </LongPressItem>
-            ))}
-          </View>
-        ) : null}
       </ScrollView>
-      <ActionSheet
-        visible={taskMenuOpen}
-        title="Adicionar tarefa à nota"
-        onClose={() => setTaskMenuOpen(false)}
-        options={[
-          { label: 'Criar tarefa', description: 'Nova tarefa ligada a esta nota', icon: 'add-circle-outline', onPress: createRelatedTask },
-          {
-            label: 'Vincular existente',
-            description: 'Escolher uma tarefa sem nota',
-            icon: 'link-outline',
-            onPress: () => void openTaskPicker(),
-          },
-        ]}
-      />
-      <BottomSheet visible={taskPickerOpen} title="Vincular tarefa" onClose={() => setTaskPickerOpen(false)}>
-        <Input value={taskQuery} onChangeText={setTaskQuery} placeholder="Buscar tarefa" />
-        {matchingTasks.map((task) => (
-          <Pressable key={task.id} style={styles.taskOption} accessibilityRole="button" onPress={() => void linkTask(task)}>
-            <Text style={styles.taskName} numberOfLines={1}>
-              {task.title}
-            </Text>
-          </Pressable>
-        ))}
-        {!matchingTasks.length ? (
-          <Text style={styles.noTasks}>
-            {availableTasks.length ? 'Nenhuma tarefa encontrada.' : 'Não há tarefas sem nota para vincular.'}
-          </Text>
-        ) : null}
-      </BottomSheet>
       <BottomSheet visible={Boolean(attachmentRename)} title="Renomear anexo" onClose={() => setAttachmentRename(undefined)}>
         <Input value={renameValue} onChangeText={setRenameValue} placeholder="Nome do anexo" autoFocus />
         <View style={styles.renameButton}>
@@ -496,21 +345,6 @@ const makeStyles = (colors: AppColors) =>
     titleActionTarget: { borderRadius: radius.md, marginHorizontal: -spacing.xs, paddingHorizontal: spacing.xs },
     title: { ...typography.title, color: colors.ink },
     meta: { ...typography.caption, color: colors.inkMuted, marginTop: 6, marginBottom: spacing.xl },
-    convertActions: { marginBottom: spacing.xl },
-    convertButton: {
-      minHeight: 52,
-      borderRadius: radius.md,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.line,
-      backgroundColor: colors.surfaceMuted,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.md,
-    },
-    convertText: { ...typography.bodyStrong, color: colors.ink, flex: 1 },
-    linkExistingButton: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.md },
-    linkExistingText: { ...typography.caption, color: colors.accent, fontWeight: '700' },
     body: { ...typography.body, color: colors.ink, lineHeight: 25, marginBottom: spacing.md, flex: 1 },
     heading: { ...typography.heading, color: colors.ink, marginVertical: spacing.md },
     checked: { textDecorationLine: 'line-through', color: colors.inkMuted },
@@ -543,27 +377,6 @@ const makeStyles = (colors: AppColors) =>
     attachmentTitle: { ...typography.bodyStrong, color: colors.ink },
     attachmentMeta: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
     chevron: { fontSize: 26, lineHeight: 30, color: colors.inkMuted, paddingHorizontal: spacing.xs },
-    tasksSection: { marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-    tasksHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-    tasksTitle: { ...typography.heading, color: colors.ink },
-    addTask: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.sm },
-    addTaskText: { ...typography.caption, color: colors.accent, fontWeight: '700' },
-    taskRow: {
-      minHeight: 70,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceMuted,
-      marginBottom: spacing.sm,
-      paddingHorizontal: spacing.sm,
-    },
-    taskCopy: { flex: 1, minWidth: 0 },
-    taskName: { ...typography.bodyStrong, color: colors.ink },
-    taskCompleted: { color: colors.inkMuted, textDecorationLine: 'line-through' },
-    taskMeta: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
-    noTasks: { ...typography.caption, color: colors.inkMuted, paddingVertical: spacing.sm },
-    taskOption: { minHeight: 52, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
     renameButton: { marginTop: spacing.md },
     muted: { ...typography.body, color: colors.inkMuted, padding: spacing.lg },
   });

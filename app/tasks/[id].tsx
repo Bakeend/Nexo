@@ -4,12 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Platform, Animated, StyleSheet, Text, View } from 'react-native';
-import { spacing, typography, useThemeStyles, type AppColors } from '@/design/theme';
-import { Header, ListRow, PrimaryButton } from '@/components/ui';
+import { radius, spacing, typography, useThemeStyles, type AppColors } from '@/design/theme';
+import { AppIcon, Header, ListRow, PrimaryButton } from '@/components/ui';
 import { LongPressItem } from '@/components/long-press-item';
 import { useItemActions, useSnackbar } from '@/components/visual';
 import { findNote, findTask, setPinnedItem, toggleTask, trashTask, updateTask } from '@/database/repositories';
 import type { Task } from '@/types/domain';
+import { noteBlocksToPlainText, parseNoteBlocks } from '@/utils/note-blocks';
 import { playUISound } from '@/services/ui-sound-service';
 import { motionDuration, motionSpring } from '@/motion/tokens';
 import { useReducedMotion } from '@/motion/useReducedMotion';
@@ -26,6 +27,7 @@ export default function TaskDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [task, setTask] = useState<Task>();
   const [relatedNoteTitle, setRelatedNoteTitle] = useState<string | null>(null);
+  const [relatedNoteContent, setRelatedNoteContent] = useState<string | null>(null);
   const [previewCompleted, setPreviewCompleted] = useState<boolean | null>(null);
   const reducedMotion = useReducedMotion();
   const offset = useRef(new Animated.Value(0)).current;
@@ -37,7 +39,9 @@ export default function TaskDetail() {
     const nextTask = await findTask(id);
     setTask(nextTask);
     const relatedNote = nextTask?.relatedNoteId ? await findNote(nextTask.relatedNoteId) : undefined;
-    setRelatedNoteTitle(relatedNote && !relatedNote.deletedAt && !relatedNote.archivedAt ? relatedNote.title || 'Nota sem título' : null);
+    const availableNote = relatedNote && !relatedNote.deletedAt && !relatedNote.archivedAt ? relatedNote : undefined;
+    setRelatedNoteTitle(availableNote ? availableNote.title || 'Nota sem título' : null);
+    setRelatedNoteContent(availableNote ? noteBlocksToPlainText(parseNoteBlocks(availableNote.content)) : null);
   }, [id]);
   useFocusEffect(
     useCallback(() => {
@@ -51,6 +55,8 @@ export default function TaskDetail() {
         <Text style={styles.muted}>Tarefa não encontrada.</Text>
       </SafeAreaView>
     );
+  const dueDate = task.dueAt ? new Date(task.dueAt) : null;
+  const taskScope = task.description?.trim() || relatedNoteContent?.trim() || '';
   const deleteTask = async () => {
     if (!reducedMotion) {
       await new Promise<void>((resolve) =>
@@ -135,13 +141,32 @@ export default function TaskDetail() {
             },
           ]}
         >
-          <Text style={[styles.title, (previewCompleted ?? Boolean(task.completedAt)) && styles.completedTitle]}>{task.title}</Text>
-          <Text style={styles.meta}>
-            {task.completedAt ? 'Concluída' : 'Pendente'} · Prioridade {priorityLabels[task.priority]}
-          </Text>
+          <View style={styles.titleRow}>
+            <View style={styles.titleCopy}>
+              <Text style={[styles.title, (previewCompleted ?? Boolean(task.completedAt)) && styles.completedTitle]}>{task.title}</Text>
+              <Text style={styles.meta}>
+                {task.completedAt ? 'Concluída' : 'Pendente'} · Prioridade {priorityLabels[task.priority]}
+              </Text>
+            </View>
+            <View style={styles.dueDate}>
+              <AppIcon name="calendar-outline" size={18} background="transparent" />
+              <View style={styles.dueDateCopy}>
+                <Text style={styles.dueDateLabel}>Prazo</Text>
+                {dueDate ? (
+                  <>
+                    <Text style={styles.dueDateValue}>{dueDate.toLocaleDateString('pt-BR')}</Text>
+                    <Text style={styles.dueTimeValue}>
+                      às {dueDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.dueDateValue}>Sem data</Text>
+                )}
+              </View>
+            </View>
+          </View>
         </LongPressItem>
-        <ListRow icon="calendar-outline" title="Data" subtitle={task.dueAt ? new Date(task.dueAt).toLocaleString('pt-BR') : 'Sem data'} />
-        {task.description ? <Text style={styles.body}>{task.description}</Text> : null}
+        {taskScope ? <Text style={styles.body}>{taskScope}</Text> : null}
         {task.relatedNoteId ? (
           <ListRow
             icon="document-text-outline"
@@ -164,9 +189,26 @@ const makeStyles = (colors: AppColors) =>
     root: { flex: 1, backgroundColor: colors.surface },
     content: { padding: spacing.lg },
     titleActionTarget: { borderRadius: 12, marginHorizontal: -spacing.xs, paddingHorizontal: spacing.xs },
+    titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+    titleCopy: { flex: 1, minWidth: 0 },
     title: { ...typography.title, color: colors.ink },
     completedTitle: { color: colors.inkMuted, textDecorationLine: 'line-through' },
-    meta: { ...typography.body, color: colors.inkMuted, marginVertical: spacing.lg },
+    meta: { ...typography.body, color: colors.inkMuted, marginTop: spacing.sm, marginBottom: spacing.lg },
+    dueDate: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      minWidth: 132,
+      maxWidth: 144,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.md,
+      backgroundColor: colors.accentSoft,
+    },
+    dueDateCopy: { flex: 1, minWidth: 0 },
+    dueDateLabel: { ...typography.meta, color: colors.accentDark, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+    dueDateValue: { ...typography.caption, color: colors.ink, fontWeight: '700', marginTop: 1 },
+    dueTimeValue: { ...typography.meta, color: colors.inkMuted, marginTop: 1 },
     body: { ...typography.body, color: colors.ink, marginVertical: spacing.lg },
     actions: { gap: spacing.sm, marginTop: spacing.xl },
     muted: { ...typography.body, color: colors.inkMuted, padding: spacing.lg },

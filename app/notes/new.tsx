@@ -2,7 +2,19 @@ import { goBackOrHome } from '@/navigation/back';
 import * as Linking from 'expo-linking';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { radius, spacing, typography, useThemeStyles, type AppColors } from '@/design/theme';
 import { AppIcon, Header, IconButton, Input, PrimaryButton } from '@/components/ui';
@@ -17,8 +29,6 @@ import {
   createNote,
   findAttachment,
   findNote,
-  listTasksForNote,
-  toggleTask,
   trashAttachment,
   updateNote,
 } from '@/database/repositories';
@@ -29,7 +39,7 @@ import { animateListLayout } from '@/motion/layout';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { playUISound } from '@/services/ui-sound-service';
 import { motionDuration } from '@/motion/tokens';
-import type { NoteBlock, NoteTextStyle, Task } from '@/types/domain';
+import type { NoteBlock, NoteTextStyle } from '@/types/domain';
 import { createChecklistItem, parseNoteBlocks, serializeNoteBlocks } from '@/utils/note-blocks';
 import { toggleTextStyle, updateTextMarks } from '@/utils/note-formatting';
 
@@ -78,6 +88,65 @@ function MotionEntry({ children, fresh }: { children: React.ReactNode; fresh: bo
   );
 }
 
+function ChecklistAddMore({
+  visible,
+  onPress,
+  addItemStyle,
+  addItemTextStyle,
+}: {
+  visible: boolean;
+  onPress: () => void;
+  addItemStyle: StyleProp<ViewStyle>;
+  addItemTextStyle: StyleProp<TextStyle>;
+}) {
+  const reducedMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(visible);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(4)).current;
+
+  useEffect(() => {
+    opacity.stopAnimation();
+    translateY.stopAnimation();
+
+    if (visible) {
+      setMounted(true);
+      if (reducedMotion) {
+        opacity.setValue(1);
+        translateY.setValue(0);
+        return;
+      }
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(translateY, { toValue: 0, duration: motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
+      ]).start();
+      return;
+    }
+
+    if (!mounted) return;
+    if (reducedMotion) {
+      opacity.setValue(0);
+      translateY.setValue(4);
+      setMounted(false);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 0, duration: motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(translateY, { toValue: 4, duration: motionDuration.normal, useNativeDriver: Platform.OS !== 'web' }),
+    ]).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }, [mounted, opacity, reducedMotion, translateY, visible]);
+
+  if (!mounted) return null;
+  return (
+    <Animated.View pointerEvents={visible ? 'auto' : 'none'} style={{ opacity, transform: [{ translateY }] }}>
+      <Pressable onPress={onPress} hitSlop={8} style={addItemStyle} accessibilityRole="button" accessibilityLabel="Adicionar mais">
+        <Text style={addItemTextStyle}>adicionar mais</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function NewNote() {
   const styles = useThemeStyles(makeStyles);
   const { showSnackbar } = useSnackbar();
@@ -88,12 +157,11 @@ export default function NewNote() {
   const [title, setTitle] = useState('');
   const [blocks, setBlocks] = useState<NoteBlock[]>(() => [{ type: 'text', text: params.seed || '' }]);
   const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(0);
+  const [activeChecklistIndex, setActiveChecklistIndex] = useState<number | null>(null);
   const selectedBlockIndex = useRef<number | null>(0);
   const selection = useRef({ start: 0, end: 0 });
   const [freshBlockIndex, setFreshBlockIndex] = useState<number | null>(null);
   const [noteId, setNoteId] = useState<string | null>(params.id || null);
-  const [noteSpaceId, setNoteSpaceId] = useState<string | null>(params.spaceId || null);
-  const [linkedTasks, setLinkedTasks] = useState<Task[]>([]);
   const [status, setStatus] = useState('');
   const [attachmentSheet, setAttachmentSheet] = useState(false);
   const [formatSheet, setFormatSheet] = useState(false);
@@ -101,6 +169,24 @@ export default function NewNote() {
   const [linkLabel, setLinkLabel] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checklistHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearChecklistHide = () => {
+    if (checklistHideTimer.current) clearTimeout(checklistHideTimer.current);
+    checklistHideTimer.current = null;
+  };
+  const showChecklistAddMore = (index: number) => {
+    clearChecklistHide();
+    setActiveChecklistIndex(index);
+  };
+  const hideChecklistAddMore = (index: number) => {
+    clearChecklistHide();
+    checklistHideTimer.current = setTimeout(() => {
+      setActiveChecklistIndex((current) => (current === index ? null : current));
+      checklistHideTimer.current = null;
+    }, 120);
+  };
+
   useEffect(() => {
     if (freshBlockIndex === null) return;
     const timeout = setTimeout(() => setFreshBlockIndex(null), motionDuration.medium);
@@ -110,13 +196,12 @@ export default function NewNote() {
   const load = useCallback(async () => {
     const activeNoteId = noteId || params.id;
     if (!activeNoteId) return;
-    const [note, tasks] = await Promise.all([findNote(activeNoteId), listTasksForNote(activeNoteId)]);
+    const note = await findNote(activeNoteId);
     if (!note) return;
     setNoteId(note.id);
-    setNoteSpaceId(note.spaceId);
     setTitle(note.title || '');
     setBlocks(withEditableLineAfterContent(parseNoteBlocks(note.content)));
-    setLinkedTasks(tasks);
+    setActiveChecklistIndex(null);
     setEditingBlockIndex(null);
   }, [noteId, params.id]);
 
@@ -126,6 +211,7 @@ export default function NewNote() {
       return () => {
         if (timer.current) clearTimeout(timer.current);
         timer.current = null;
+        clearChecklistHide();
       };
     }, [load]),
   );
@@ -185,10 +271,15 @@ export default function NewNote() {
     if (block.type !== 'text') playUISound('pop');
     selectedBlockIndex.current = null;
     setEditingBlockIndex(null);
-    setFreshBlockIndex(blocks.length);
-    setBlocks((current) => withEditableLineAfterContent([...current, block]));
+    const nextBlocks = withEditableLineAfterContent([...blocks, block]);
+    const nextBlockIndex = nextBlocks.indexOf(block);
+    setActiveChecklistIndex(block.type === 'checklist' ? nextBlockIndex : null);
+    setFreshBlockIndex(nextBlockIndex);
+    setBlocks(nextBlocks);
   };
   const insertTextAfter = (index: number) => {
+    clearChecklistHide();
+    setActiveChecklistIndex(null);
     animateListLayout(reducedMotion);
     setBlocks((current) => {
       if (current[index + 1]?.type === 'text') return current;
@@ -235,6 +326,7 @@ export default function NewNote() {
     const block = blocks[index];
     selectedBlockIndex.current = null;
     setEditingBlockIndex(null);
+    setActiveChecklistIndex(null);
     animateListLayout(reducedMotion);
     playUISound('swipe-soft');
     setBlocks((current) => {
@@ -358,30 +450,6 @@ export default function NewNote() {
     clearPendingSave();
     if (id) router.push({ pathname: '/media/audio', params: { noteId: id } });
   };
-  const openRelatedTask = async () => {
-    try {
-      const id = await ensureNote();
-      router.push({ pathname: '/tasks/new', params: { relatedNoteId: id, spaceId: noteSpaceId || '' } });
-    } catch {
-      showSnackbar('Não foi possível salvar a nota para criar a tarefa', 'error');
-    }
-  };
-  const toggleLinkedTask = async (task: Task) => {
-    try {
-      await toggleTask(task.id, !task.completedAt);
-      if (noteId) setLinkedTasks(await listTasksForNote(noteId));
-    } catch {
-      showSnackbar('Não foi possível atualizar a tarefa', 'error');
-    }
-  };
-  const openLinkedTask = async (task: Task) => {
-    try {
-      await save();
-      router.push({ pathname: '/tasks/[id]', params: { id: task.id } });
-    } catch {
-      showSnackbar('Não foi possível salvar a nota', 'error');
-    }
-  };
   const reportAttachmentError = (error: unknown, fallback: string) => {
     const message = error instanceof Error && error.message ? error.message : fallback;
     setStatus(message);
@@ -427,7 +495,10 @@ export default function NewNote() {
           <Input
             value={title}
             onChangeText={setTitle}
-            onFocus={() => (selectedBlockIndex.current = null)}
+            onFocus={() => {
+              selectedBlockIndex.current = null;
+              setActiveChecklistIndex(null);
+            }}
             placeholder="Título"
             style={styles.titleInput}
           />
@@ -435,21 +506,13 @@ export default function NewNote() {
             if (block.type === 'checklist')
               return (
                 <MotionEntry key={`checklist-${index}`} fresh={freshBlockIndex === index}>
-                  <View style={styles.checklistBlock}>
-                    <LongPressItem
-                      title="Checklist"
-                      actions={[
-                        { label: 'Excluir checklist', icon: 'trash-outline', destructive: true, onPress: () => requestRemoveBlock(index) },
-                      ]}
-                      style={styles.blockHeader}
-                    >
-                      <Text style={styles.blockLabel}>Checklist</Text>
-                    </LongPressItem>
+                  <View style={[styles.checklistBlock, index > 0 && blocks[index - 1]?.type === 'text' && styles.checklistAfterText]}>
                     {block.items.map((item, itemIndex) => (
                       <LongPressItem
                         key={item.id}
                         containerRole="none"
                         title={item.text || 'Item da checklist'}
+                        onPress={() => showChecklistAddMore(index)}
                         actions={[
                           {
                             label: 'Excluir item',
@@ -457,6 +520,16 @@ export default function NewNote() {
                             destructive: true,
                             onPress: () => requestRemoveChecklistItem(index, itemIndex),
                           },
+                          ...(itemIndex === 0
+                            ? [
+                                {
+                                  label: 'Excluir checklist',
+                                  icon: 'trash-outline' as const,
+                                  destructive: true,
+                                  onPress: () => requestRemoveBlock(index),
+                                },
+                              ]
+                            : []),
                         ]}
                         style={styles.checklistRow}
                       >
@@ -468,7 +541,11 @@ export default function NewNote() {
                         <Input
                           value={item.text}
                           onChangeText={(text) => updateChecklistItem(index, itemIndex, { text })}
-                          onFocus={() => (selectedBlockIndex.current = null)}
+                          onFocus={() => {
+                            selectedBlockIndex.current = null;
+                            showChecklistAddMore(index);
+                          }}
+                          onBlur={() => hideChecklistAddMore(index)}
                           placeholder="Item da checklist"
                           onSubmitEditing={() => {
                             if (itemIndex === block.items.length - 1) insertTextAfter(index);
@@ -477,8 +554,13 @@ export default function NewNote() {
                         />
                       </LongPressItem>
                     ))}
-                    <Pressable
+                    <ChecklistAddMore
+                      visible={activeChecklistIndex === index}
+                      addItemStyle={styles.addItem}
+                      addItemTextStyle={styles.addItemText}
                       onPress={() => {
+                        clearChecklistHide();
+                        showChecklistAddMore(index);
                         animateListLayout(reducedMotion);
                         setBlocks((current) =>
                           current.map((item, itemIndex) =>
@@ -488,10 +570,7 @@ export default function NewNote() {
                           ),
                         );
                       }}
-                      style={styles.addItem}
-                    >
-                      <Text style={styles.addItemText}>+ Adicionar item</Text>
-                    </Pressable>
+                    />
                   </View>
                 </MotionEntry>
               );
@@ -644,9 +723,13 @@ export default function NewNote() {
                       onFocus={() => {
                         selectedBlockIndex.current = index;
                         selection.current = { start: 0, end: 0 };
+                        setActiveChecklistIndex(null);
                         setEditingBlockIndex(index);
                       }}
-                      onBlur={() => setEditingBlockIndex((current) => (current === index ? null : current))}
+                      onBlur={() => {
+                        setActiveChecklistIndex(null);
+                        setEditingBlockIndex((current) => (current === index ? null : current));
+                      }}
                       onSelectionChange={(event) => {
                         if (selectedBlockIndex.current === index) selection.current = event.nativeEvent.selection;
                       }}
@@ -673,32 +756,6 @@ export default function NewNote() {
               );
             return null;
           })}
-          {noteId && linkedTasks.length ? (
-            <View style={styles.linkedTasks}>
-              <Text style={styles.linkedTasksTitle}>Tarefas</Text>
-              {linkedTasks.map((task) => (
-                <LongPressItem
-                  key={task.id}
-                  title={task.title}
-                  onPress={() => void openLinkedTask(task)}
-                  style={styles.linkedTaskRow}
-                  actions={[
-                    {
-                      label: 'Abrir tarefa',
-                      icon: 'open-outline',
-                      onPress: () => void openLinkedTask(task),
-                    },
-                  ]}
-                >
-                  <Checkbox checked={Boolean(task.completedAt)} label={task.title} onPress={() => toggleLinkedTask(task)} />
-                  <Text style={[styles.linkedTaskName, task.completedAt && styles.checkedText]} numberOfLines={2}>
-                    {task.title}
-                  </Text>
-                  <Text style={styles.chevron}>›</Text>
-                </LongPressItem>
-              ))}
-            </View>
-          ) : null}
         </ScrollView>
         <View style={styles.toolbar}>
           <IconButton icon="text-outline" onPress={() => setFormatSheet(true)} label="Formatação" />
@@ -707,7 +764,6 @@ export default function NewNote() {
             onPress={() => addBlock({ type: 'checklist', items: [createChecklistItem()] })}
             label="Checklist"
           />
-          <IconButton icon="checkmark-circle-outline" onPress={() => void openRelatedTask()} label="Criar tarefa nesta nota" />
           <IconButton icon="attach-outline" onPress={() => setAttachmentSheet(true)} label="Anexo" />
         </View>
         <ActionSheet
@@ -814,19 +870,6 @@ const makeStyles = (colors: AppColors) =>
     safeRoot: { flex: 1, backgroundColor: colors.canvas },
     root: { flex: 1, backgroundColor: colors.surface },
     editor: { padding: spacing.lg, paddingBottom: 100, gap: spacing.sm },
-    linkedTasks: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-    linkedTasksTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.md },
-    linkedTaskRow: {
-      minHeight: 68,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceMuted,
-      marginBottom: spacing.sm,
-      paddingHorizontal: spacing.sm,
-    },
-    linkedTaskName: { ...typography.bodyStrong, color: colors.ink, flex: 1 },
     titleInput: {
       backgroundColor: 'transparent',
       paddingHorizontal: 0,
@@ -839,9 +882,8 @@ const makeStyles = (colors: AppColors) =>
     blockInput: { backgroundColor: 'transparent', paddingHorizontal: 0, minHeight: 48, lineHeight: 25, color: colors.ink },
     headingInput: { ...typography.heading, minHeight: 44, marginTop: spacing.md },
     bulletInput: { paddingLeft: spacing.lg },
-    checklistBlock: { marginVertical: spacing.sm },
-    blockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
-    blockLabel: { ...typography.caption, color: colors.inkMuted, fontWeight: '700' },
+    checklistBlock: { marginTop: 0, marginBottom: 0 },
+    checklistAfterText: { marginTop: -spacing.xxl },
     editorBlockRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -852,14 +894,20 @@ const makeStyles = (colors: AppColors) =>
     editorAttachmentCard: { gap: spacing.xs },
     audioBlock: { marginBottom: spacing.sm },
     editorAttachmentPressed: { backgroundColor: colors.surfacePressed },
-    editorBlockInput: { flex: 1, minWidth: 0, outlineStyle: 'none' as unknown as 'solid' },
+    editorBlockInput: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 25,
+      paddingVertical: 0,
+      outlineStyle: 'none' as unknown as 'solid',
+    },
     formattedPreview: { minHeight: 48, justifyContent: 'center' },
     editorBlockContent: { flex: 1 },
     checklistRow: { flexDirection: 'row', alignItems: 'center', width: '100%' },
     checklistInput: { flex: 1, minWidth: 0 },
     checkedText: { textDecorationLine: 'line-through', color: colors.inkMuted },
-    addItem: { minHeight: 42, justifyContent: 'center', paddingLeft: 44 },
-    addItemText: { ...typography.caption, color: colors.accent, fontWeight: '700' },
+    addItem: { minHeight: 32, alignSelf: 'flex-start', justifyContent: 'center', marginLeft: 44, paddingHorizontal: spacing.xs },
+    addItemText: { ...typography.caption, color: colors.accent, fontWeight: '600' },
     attachmentBlock: {
       minHeight: 62,
       borderRadius: radius.md,
