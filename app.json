@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nexo",
     "slug": "nexo",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -24,8 +24,14 @@
         {
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": ["text/*", "image/*", "application/*"],
-            "multipleShareMimeTypes": ["*/*"]
+            "singleShareMimeTypes": [
+              "text/*",
+              "image/*",
+              "application/*"
+            ],
+            "multipleShareMimeTypes": [
+              "*/*"
+            ]
           }
         }
       ],
@@ -49,7 +55,25 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
-    }
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "extra": {
+      "router": {
+        "headers": {
+          "Cross-Origin-Embedder-Policy": "credentialless",
+          "Cross-Origin-Opener-Policy": "same-origin"
+        }
+      },
+      "eas": {
+        "projectId": "5a6ac8e9-a738-4c7f-af2e-585c80310939"
+      }
+    },
+    "owner": "dyasbr"
   }
 }

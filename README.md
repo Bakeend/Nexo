@@ -23,6 +23,8 @@ Aplicativo pessoal para capturar, organizar e lembrar do que importa. O Nexo é 
 - Atualmente não há conta, backend nem sincronização na nuvem.
 - A importação de arquivos aceita até 50 MB por arquivo. No backup, cada arquivo de mídia pode ter até 50 MB, a mídia somada até 100 MB e o arquivo final até 160 MB.
 
+As instrucoes para gerar o APK estavel e versionar builds futuras estao em [BUILDING.md](BUILDING.md).
+
 ## Tecnologias
 
 - Expo SDK 57 e React Native

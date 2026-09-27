@@ -490,6 +490,11 @@ export default function NewNote() {
               .catch(() => setStatus('Não foi possível salvar'))
           }
           actionLabel={status || 'Salvar'}
+          actionLeadingIcon={
+            status === 'Salvo' ? 'checkmark-circle' : status.startsWith('Não foi possível') ? 'alert-circle-outline' : 'save-outline'
+          }
+          actionLoading={status === 'Salvando…'}
+          actionTone={status === 'Salvo' ? 'success' : status.startsWith('Não foi possível') ? 'error' : 'primary'}
         />
         <ScrollView contentContainerStyle={styles.editor} keyboardShouldPersistTaps="handled">
           <Input

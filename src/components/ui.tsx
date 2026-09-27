@@ -98,6 +98,9 @@ export function Header({
   action,
   actionLabel,
   actionIcon,
+  actionLeadingIcon,
+  actionLoading = false,
+  actionTone = 'default',
   transparent = false,
 }: {
   title: string;
@@ -106,9 +109,59 @@ export function Header({
   action?: () => void;
   actionLabel?: string;
   actionIcon?: IconName;
+  actionLeadingIcon?: IconName;
+  actionLoading?: boolean;
+  actionTone?: 'default' | 'primary' | 'success' | 'error';
   transparent?: boolean;
 }) {
+  const palette = useThemeColors();
   const styles = useThemeStyles(makeStyles);
+  const reducedMotion = useReducedMotion();
+  const actionFeedback = useRef(new Animated.Value(1)).current;
+  const previousActionLabel = useRef(actionLabel);
+
+  useEffect(() => {
+    if (previousActionLabel.current === actionLabel) return;
+    previousActionLabel.current = actionLabel;
+    actionFeedback.stopAnimation();
+    if (reducedMotion) {
+      actionFeedback.setValue(1);
+      return;
+    }
+    actionFeedback.setValue(0.84);
+    Animated.spring(actionFeedback, {
+      toValue: 1,
+      ...motionSpring.selection,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+    return () => actionFeedback.stopAnimation();
+  }, [actionFeedback, actionLabel, reducedMotion]);
+
+  const actionForeground =
+    actionTone === 'primary'
+      ? palette.onAccent
+      : actionTone === 'success'
+        ? palette.success
+        : actionTone === 'error'
+          ? palette.danger
+          : palette.accent;
+  const actionButtonToneStyle =
+    actionTone === 'primary'
+      ? styles.headerActionPrimary
+      : actionTone === 'success'
+        ? styles.headerActionSuccess
+        : actionTone === 'error'
+          ? styles.headerActionError
+          : styles.headerActionDefault;
+  const actionTextToneStyle =
+    actionTone === 'primary'
+      ? styles.headerActionTextPrimary
+      : actionTone === 'success'
+        ? styles.headerActionTextSuccess
+        : actionTone === 'error'
+          ? styles.headerActionTextError
+          : styles.headerActionTextDefault;
+
   return (
     <View style={[styles.header, transparent && { backgroundColor: 'transparent' }]}>
       {onBack ? <IconButton icon="chevron-back" onPress={onBack} label="Voltar" /> : <View style={styles.headerSpacer} />}
@@ -123,11 +176,26 @@ export function Header({
           <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel={actionLabel}
+            accessibilityState={{ disabled: actionLoading, busy: actionLoading }}
+            disabled={actionLoading}
             onPress={action}
-            hitSlop={10}
+            style={({ pressed }) => [
+              styles.headerActionButton,
+              actionButtonToneStyle,
+              pressed && styles.headerActionPressed,
+            ]}
             pressedScale={motionScale.secondary}
           >
-            <Text style={styles.headerAction}>{actionLabel}</Text>
+            <Animated.View style={[styles.headerActionContent, { transform: [{ scale: actionFeedback }] }]}>
+              {actionLoading ? (
+                <ActivityIndicator size="small" color={actionForeground} />
+              ) : actionLeadingIcon ? (
+                <Ionicons name={actionLeadingIcon} size={18} color={actionForeground} />
+              ) : null}
+              <Text style={[styles.headerActionText, actionTextToneStyle]} numberOfLines={1}>
+                {actionLabel}
+              </Text>
+            </Animated.View>
           </AnimatedPressable>
         ) : (
           <IconButton icon="ellipsis-horizontal" onPress={action} label="Mais opções" />
@@ -196,9 +264,9 @@ export function PrimaryButton({
       pressedScale={motionScale.primary}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={colors.onInk} />
+        <ActivityIndicator size="small" color={colors.onAccent} />
       ) : icon ? (
-        <Ionicons name={icon} color={colors.onInk} size={18} />
+        <Ionicons name={icon} color={colors.onAccent} size={20} />
       ) : null}
       <Text style={styles.primaryText}>{title}</Text>
     </AnimatedPressable>
@@ -226,7 +294,11 @@ export function SecondaryButton({
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       disabled={disabled || loading}
       onPress={onPress}
-      style={[styles.secondaryButton, (disabled || loading) && styles.disabled]}
+      style={({ pressed }) => [
+        styles.secondaryButton,
+        (disabled || loading) && styles.disabled,
+        pressed && !disabled && !loading && styles.secondaryPressed,
+      ]}
       pressedScale={motionScale.secondary}
     >
       {loading ? (
@@ -737,36 +809,72 @@ const makeStyles = (colors: AppColors) =>
       paddingHorizontal: spacing.lg,
       backgroundColor: colors.canvas,
     },
-    headerSpacer: { width: 42 },
+    headerSpacer: { width: 48 },
     headerTitle: { flex: 1, alignItems: 'center' },
     headerText: { ...typography.heading, color: colors.ink },
     headerSubtitle: { ...typography.meta, color: colors.inkMuted, marginTop: 2 },
-    headerAction: { ...typography.caption, color: colors.accent, fontWeight: '700' },
-    iconButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+    headerActionButton: {
+      minWidth: 88,
+      maxWidth: '72%',
+      minHeight: 48,
+      paddingHorizontal: spacing.md,
+      borderWidth: 1,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerActionContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      flexShrink: 1,
+    },
+    headerActionDefault: { backgroundColor: colors.accentSoft, borderColor: colors.accentSoft },
+    headerActionPrimary: { backgroundColor: colors.accent, borderColor: colors.accent },
+    headerActionSuccess: { backgroundColor: colors.successSoft, borderColor: colors.successSoft },
+    headerActionError: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerSoft },
+    headerActionPressed: { opacity: 0.82 },
+    headerActionText: { fontSize: 14, fontWeight: '700', flexShrink: 1 },
+    headerActionTextDefault: { color: colors.accent },
+    headerActionTextPrimary: { color: colors.onAccent },
+    headerActionTextSuccess: { color: colors.success },
+    headerActionTextError: { color: colors.danger },
+    iconButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
     iconWrap: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     pressed: { backgroundColor: colors.surfacePressed },
     primaryButton: {
-      minHeight: 52,
-      borderRadius: 14,
-      backgroundColor: colors.ink,
+      minHeight: 58,
+      borderRadius: radius.lg,
+      backgroundColor: colors.accent,
       flexDirection: 'row',
-      gap: 8,
+      gap: 10,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.xl,
+      shadowColor: colors.accent,
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: 3,
     },
-    primaryPressed: { opacity: 0.85 },
-    primaryText: { color: colors.onInk, fontWeight: '700', fontSize: 14 },
+    primaryPressed: { opacity: 0.88 },
+    primaryText: { color: colors.onAccent, fontWeight: '700', fontSize: 16, letterSpacing: 0.1 },
     disabled: { opacity: 0.45 },
     secondaryButton: {
-      minHeight: 44,
+      minHeight: 50,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
-      gap: 7,
-      paddingHorizontal: spacing.md,
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.accentSoft,
+      backgroundColor: colors.accentSoft,
     },
-    secondaryText: { color: colors.accent, fontWeight: '700' },
+    secondaryPressed: { backgroundColor: colors.surfacePressed, borderColor: colors.line },
+    secondaryText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
     input: {
       backgroundColor: colors.surfaceMuted,
       borderRadius: 13,

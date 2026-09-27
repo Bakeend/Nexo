@@ -142,7 +142,7 @@ export default function NoteDetail() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <Header title="Nota" onBack={() => goBackOrHome()} action={openEditor} actionLabel="Editar" />
+      <Header title="Nota" onBack={() => goBackOrHome()} action={openEditor} actionLabel="Editar" actionLeadingIcon="create-outline" />
       <ScrollView contentContainerStyle={styles.content}>
         <LongPressItem
           title={note.title || 'Nota sem título'}
