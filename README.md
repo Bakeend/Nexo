@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme-banner.svg" alt="Nexo — aplicativo pessoal local-first para notas, tarefas e lembretes" width="100%" />
+  <img src="assets/readme-banner.webp" alt="Nexo — aplicativo pessoal local-first para notas, tarefas e lembretes" width="100%" />
 </p>
 
 <p align="center">
