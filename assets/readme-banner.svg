@@ -1,0 +1,65 @@
+<svg width="1400" height="420" viewBox="0 0 1400 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1400" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10141F"/>
+      <stop offset="0.58" stop-color="#182342"/>
+      <stop offset="1" stop-color="#294FC2"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#8BA4FF"/>
+      <stop offset="1" stop-color="#4B6FF3"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="420" rx="32" fill="url(#bg)"/>
+  <circle cx="1185" cy="48" r="210" fill="#4B6FF3" fill-opacity="0.18" filter="url(#glow)"/>
+  <circle cx="155" cy="390" r="190" fill="#8BA4FF" fill-opacity="0.10" filter="url(#glow)"/>
+
+  <!-- Connected information motif -->
+  <g opacity="0.92">
+    <path d="M134 102L230 151L170 240L278 296" stroke="#8BA4FF" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
+    <path d="M230 151L324 104L356 204L278 296" stroke="#4B6FF3" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+    <circle cx="134" cy="102" r="12" fill="#EAF0FF"/>
+    <circle cx="230" cy="151" r="18" fill="url(#accent)"/>
+    <circle cx="170" cy="240" r="11" fill="#65D1AC"/>
+    <circle cx="324" cy="104" r="10" fill="#F4B66B"/>
+    <circle cx="356" cy="204" r="14" fill="#8BA4FF"/>
+    <circle cx="278" cy="296" r="20" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Brand -->
+  <g>
+    <text x="454" y="186" fill="#FFFFFF" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="92" font-weight="800" letter-spacing="-3">Nexo</text>
+    <text x="458" y="240" fill="#CDD4E3" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="26" font-weight="500">Capture. Organize. Lembre.</text>
+    <rect x="458" y="270" width="238" height="42" rx="21" fill="#EAF0FF" fill-opacity="0.11" stroke="#8BA4FF" stroke-opacity="0.35"/>
+    <text x="480" y="298" fill="#C4D0FF" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="600">local-first • offline • privado</text>
+  </g>
+
+  <!-- Small product cards -->
+  <g transform="translate(1042 116)">
+    <rect width="246" height="74" rx="18" fill="#FFFFFF" fill-opacity="0.10" stroke="#FFFFFF" stroke-opacity="0.16"/>
+    <circle cx="34" cy="37" r="13" fill="#65D1AC"/>
+    <path d="M28 37L33 42L41 32" stroke="#10141F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="60" y="33" fill="#FFFFFF" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="700">Tarefas</text>
+    <text x="60" y="54" fill="#A4AEC2" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12">prioridades e datas</text>
+  </g>
+
+  <g transform="translate(996 210)">
+    <rect width="292" height="74" rx="18" fill="#FFFFFF" fill-opacity="0.10" stroke="#FFFFFF" stroke-opacity="0.16"/>
+    <rect x="22" y="22" width="25" height="30" rx="6" fill="#8BA4FF"/>
+    <path d="M29 31H40M29 38H40M29 45H36" stroke="#10141F" stroke-width="2.3" stroke-linecap="round"/>
+    <text x="63" y="33" fill="#FFFFFF" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="700">Notas</text>
+    <text x="63" y="54" fill="#A4AEC2" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12">ideias, links e anexos</text>
+  </g>
+
+  <g transform="translate(1080 304)">
+    <rect width="208" height="66" rx="18" fill="#FFFFFF" fill-opacity="0.10" stroke="#FFFFFF" stroke-opacity="0.16"/>
+    <circle cx="32" cy="33" r="12" fill="#F4B66B"/>
+    <path d="M32 26V33L37 36" stroke="#10141F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="56" y="31" fill="#FFFFFF" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Lembretes</text>
+    <text x="56" y="50" fill="#A4AEC2" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11">no seu tempo</text>
+  </g>
+</svg>
